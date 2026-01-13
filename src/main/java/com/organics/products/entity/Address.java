@@ -20,6 +20,8 @@ public class Address {
     private String city;
     private Integer pinCode;
     private String landMark;
+
+    private Boolean isPrimary = false;
     @ManyToOne
     @JoinColumn(name = "customer_id")
     private Customer customer;

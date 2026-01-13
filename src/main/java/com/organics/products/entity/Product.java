@@ -1,14 +1,24 @@
 package com.organics.products.entity;
 
-
-import jakarta.persistence.*;
-import lombok.Data;
-
 import java.math.BigDecimal;
 import java.util.List;
 
-@Entity
+import com.fasterxml.jackson.annotation.JsonManagedReference;
+
+import jakarta.persistence.CascadeType;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.Table;
+import lombok.Data;
+
+
 @Data
+@Entity
 @Table(name = "products")
 public class Product {
 
@@ -17,21 +27,18 @@ public class Product {
     private Long id;
 
     private String productName;
-   // private Long stock;
     private String brand;
-    private String productImage;
     private String description;
     private Double discount;
-
     private Integer returnDays;
-    private BigDecimal MRP;
+    private Double MRP;
+    private Boolean status;
 
     @ManyToOne
     @JoinColumn(name = "category_id")
     private Category category;
 
-    @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
-    private List<OrderItems> orderItems;
-
-
+    @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
+    @JsonManagedReference
+    private List<ProductImage> images;
 }

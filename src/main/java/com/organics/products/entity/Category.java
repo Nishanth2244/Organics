@@ -15,5 +15,6 @@ public class Category {
     private String categoryName;
     private String description;
     private String categoryImage;
+    private Boolean status;
 
 }
