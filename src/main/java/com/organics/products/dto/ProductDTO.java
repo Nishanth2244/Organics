@@ -12,6 +12,7 @@ public class ProductDTO {
     private Double discount;
     private Integer returnDays;
     private Double mrp;
+    private Double afterDiscount;
     private Boolean status;
     private Long categoryId;
     private List<String> imageUrls; 

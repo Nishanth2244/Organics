@@ -7,19 +7,20 @@ import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import com.organics.products.config.SecurityUtil;
 import com.organics.products.dto.AddToCartRequest;
 import com.organics.products.dto.CartDTO;
 import com.organics.products.dto.CartItemDTO;
 import com.organics.products.dto.CategoryDTO;
 import com.organics.products.entity.Cart;
 import com.organics.products.entity.CartItems;
-import com.organics.products.entity.Customer;
 import com.organics.products.entity.Product;
+import com.organics.products.entity.User;
 import com.organics.products.exception.ResourceNotFoundException;
 import com.organics.products.respository.CartItemRepository;
 import com.organics.products.respository.CartRepository;
-import com.organics.products.respository.CustomerRepository;
 import com.organics.products.respository.ProductRepo;
+import com.organics.products.respository.UserRepository;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -29,7 +30,7 @@ import lombok.extern.slf4j.Slf4j;
 public class CartService {
 	
 	@Autowired
-	private CustomerRepository customerRepository;
+	private UserRepository customerRepository;
 	
 	@Autowired
 	private CartRepository cartRepository;
@@ -50,7 +51,7 @@ public class CartService {
 	    dto.setId(cart.getId());
 	    dto.setActive(true);
 	    dto.setTotalAmount(cart.getTotalAmount());
-	    dto.setCustomerId(cart.getCustomer().getId());
+	    dto.setCustomerId(cart.getUser().getId());
 	    
 	    List<CartItemDTO> itemDTOs = cart.getItems().stream().map(item -> {
 	        CartItemDTO itemDTO = new CartItemDTO();
@@ -71,15 +72,15 @@ public class CartService {
 	
 	
 	
-	private Cart getOrCreateActiveCart(Customer customer) {
+	private Cart getOrCreateActiveCart(User customer) {
 		
-		List<Cart> activeCarts = cartRepository.findByCustomerAndIsActive(customer, true);
+		List<Cart> activeCarts = cartRepository.findByUserAndIsActive(customer, true);
 		Cart cart;
 
 		if (activeCarts.isEmpty()) {
 			log.info("No active cart found for user {}. Creating a new one.", customer);
 			cart = new Cart();
-			cart.setCustomer(customer);
+			cart.setUser(customer);
 			cart.setTotalAmount(0.0);
 			cart.setActive(true);
 			return cartRepository.save(cart); 
@@ -101,9 +102,14 @@ public class CartService {
 	}
 
 
-	public CartDTO addToCart(AddToCartRequest addToCartRequest, Long customerId) {
+	public CartDTO addToCart(AddToCartRequest addToCartRequest) {
 		
-		Customer customer = customerRepository.findById(customerId)
+		Long customerId = SecurityUtil.getCurrentUserId()
+	            .orElseThrow(() -> new RuntimeException("User not authenticated"));
+		
+		log.info("Current logged in user {}", customerId);
+		
+		User customer = customerRepository.findById(customerId)
 				.orElseThrow(() -> new ResourceNotFoundException("User not Found to add Items to cart: "+ customerId));
 		
 		Cart cart = getOrCreateActiveCart(customer);

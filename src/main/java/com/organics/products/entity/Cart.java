@@ -26,6 +26,6 @@ public class Cart {
     private Set<CartItems> items = new HashSet<>();
 
     @ManyToOne
-    @JoinColumn(name = "customer_id")
-    private Customer customer;
+    @JoinColumn(name = "user_id")
+    private User user;
 }

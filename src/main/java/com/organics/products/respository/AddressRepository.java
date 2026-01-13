@@ -11,12 +11,12 @@ import java.util.Optional;
 
 @Repository
 public interface AddressRepository extends JpaRepository<Address, Long> {
-    List<Address> findByCustomerId(Long customerId);
-    List<Address> findByPhoneNumber(Long phoneNumber);
-    List<Address> findByCityAndState(String city, String state);
-    
-    @Query("SELECT a FROM Address a WHERE a.customer.id = :customerId AND a.isPrimary = true")
-    Optional<Address> findPrimaryAddressByCustomerId(@Param("customerId") Long customerId);
-    
-    void deleteByCustomerId(Long customerId);
+//    List<Address> findByCustomerId(Long customerId);
+//    List<Address> findByPhoneNumber(Long phoneNumber);
+//    List<Address> findByCityAndState(String city, String state);
+//    
+//    @Query("SELECT a FROM Address a WHERE a.customer.id = :customerId AND a.isPrimary = true")
+//    Optional<Address> findPrimaryAddressByCustomerId(@Param("customerId") Long customerId);
+//    
+//    void deleteByCustomerId(Long customerId);
 }

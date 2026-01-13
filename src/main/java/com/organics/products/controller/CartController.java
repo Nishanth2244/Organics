@@ -24,10 +24,9 @@ public class CartController {
 	
 	
 	@PostMapping("/addItem")
-	public CartDTO addCart(@RequestBody AddToCartRequest addToCartRequest,
-						@RequestParam Long customerId) {
+	public CartDTO addCart(@RequestBody AddToCartRequest addToCartRequest) {
 		
-		CartDTO cartDTO = cartService.addToCart(addToCartRequest, customerId);
+		CartDTO cartDTO = cartService.addToCart(addToCartRequest);
 		
 		log.info("Item added to cart Succesfully: {}", addToCartRequest.getProductId());
 		return cartDTO;
