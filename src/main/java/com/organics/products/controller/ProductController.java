@@ -64,6 +64,8 @@ public class ProductController {
 	public List<ProductDTO> getActive() {
 
 		List<ProductDTO> products = productService.activeProd();
+		
+		log.info("Fetching active products");
 		return products;
 	}
 	
