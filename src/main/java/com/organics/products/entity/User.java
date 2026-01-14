@@ -9,6 +9,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
+
 @Entity
 @Table(
         name = "users",
@@ -38,7 +39,6 @@ public class User {
     private LocalDateTime createdAt;
     private LocalDateTime lastLogin;
 
-
     private String displayName;
     private String firstName;
     private String middleName;
@@ -46,7 +46,6 @@ public class User {
     private String gender;
     private LocalDate dateOfBirth;
     private Integer age;
-
 
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Address> addresses = new ArrayList<>();

@@ -2,9 +2,11 @@ package com.organics.products.respository;
 
 import com.organics.products.entity.Address;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
@@ -19,4 +21,8 @@ public interface AddressRepository extends JpaRepository<Address, Long> {
 //    Optional<Address> findPrimaryAddressByCustomerId(@Param("customerId") Long customerId);
 //    
 //    void deleteByCustomerId(Long customerId);
+@Modifying
+@Transactional
+@Query("update Address a set a.isPrimary=false where a.user.id=:userId")
+void clearPrimary(Long userId);
 }
