@@ -1,5 +1,7 @@
 package com.organics.products.entity;
 
+import java.util.List;
+
 import jakarta.persistence.*;
 import jakarta.persistence.criteria.CriteriaBuilder;
 import jakarta.validation.constraints.NotBlank;
@@ -50,4 +52,7 @@ public class Address {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
+    
+    @OneToMany(mappedBy = "address")
+    private List<Order> orders;
 }

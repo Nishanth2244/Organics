@@ -3,6 +3,8 @@ package com.organics.products.dto;
 import lombok.Data;
 import java.util.List;
 
+import com.organics.products.entity.UnitType;
+
 @Data
 public class ProductDTO {
     private Long id;
@@ -15,5 +17,7 @@ public class ProductDTO {
     private Double discount;
     private Boolean status;
     private Long categoryId;
+    private UnitType unit;
+    private Double quantity;
     private List<String> imageUrls; 
 }

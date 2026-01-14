@@ -13,6 +13,7 @@ import com.organics.products.dto.ProductDTO;
 import com.organics.products.entity.Category;
 import com.organics.products.entity.Product;
 import com.organics.products.entity.ProductImage;
+import com.organics.products.entity.UnitType;
 import com.organics.products.exception.ResourceNotFoundException;
 import com.organics.products.respository.CategoryRepo;
 import com.organics.products.respository.ProductRepo;
@@ -45,6 +46,8 @@ public class ProductService {
 		dto.setMrp(product.getMRP());
 		dto.setStatus(product.getStatus());
 		dto.setAfterDiscount(product.getAfterDiscount());
+		dto.setUnit(product.getUnit());
+		dto.setQuantity(product.getQuantity());
 
 		if (product.getCategory() != null) {
 			dto.setCategoryId(product.getCategory().getId());
@@ -62,7 +65,7 @@ public class ProductService {
 	
 
 	public ProductDTO add(Long categoryId, MultipartFile[] images, String productName, String brand, String description,
-			Double discount, Integer returnDays, Double mrp) throws IOException {
+			Double discount, Integer returnDays, Double mrp, UnitType unitType, Double quantity) throws IOException {
 
 		Category category = categoryRepo.findById(categoryId)
 				.orElseThrow(() -> new ResourceNotFoundException("Category not found"));
@@ -76,6 +79,8 @@ public class ProductService {
 		product.setMRP(mrp);
 		product.setCategory(category);
 		product.setStatus(true);
+		product.setUnit(unitType);
+		product.setQuantity(quantity);
 		
 		if (mrp != null && discount != null) {
 		    product.setAfterDiscount(mrp - (mrp * discount / 100));
@@ -141,7 +146,7 @@ public class ProductService {
 	
 
 	public Product updateProduct(Long id, MultipartFile[] images, String productName, String brand, String description,
-			Double discount, Integer returnDays, Double mrp, Long categoryId) throws IOException {
+			Double discount, Integer returnDays, Double mrp, Long categoryId, UnitType unitType, Double quantity) throws IOException {
 
 		Product product = productRepo.findById(id)
 				.orElseThrow(() -> new ResourceNotFoundException("Product not found with id: " + id));
@@ -158,6 +163,14 @@ public class ProductService {
 			product.setReturnDays(returnDays);
 		if (mrp != null)
 			product.setMRP(mrp);
+		
+		if(unitType != null) {
+			product.setUnit(unitType);
+		}
+		
+		if(quantity != null) {
+			product.setQuantity(quantity);
+		}
 		
 		if (product.getMRP() != null && product.getDiscount() != null) {
 		    product.setAfterDiscount(product.getMRP() - (product.getMRP() * product.getDiscount() / 100));

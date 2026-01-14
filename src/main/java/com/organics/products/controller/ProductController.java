@@ -20,6 +20,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.organics.products.dto.ProductDTO;
 import com.organics.products.entity.Product;
+import com.organics.products.entity.UnitType;
 import com.organics.products.service.ProductService;
 
 import lombok.extern.slf4j.Slf4j;
@@ -43,9 +44,11 @@ public class ProductController {
 			@RequestParam(value = "description", required = false) String description,
 			@RequestParam(value = "discount", required = false) Double discount,
 			@RequestParam(value = "returnDays", required = false) Integer returnDays,
+			@RequestParam(value = "unit", required = false) UnitType unitType,
+			@RequestParam(value = "quantity", required = false) Double quantity,
 			@RequestParam(value = "mrp", required = false) Double mrp) throws IOException {
 
-		return productService.add(categoryId, images, productName, brand, description, discount, returnDays, mrp);
+		return productService.add(categoryId, images, productName, brand, description, discount, returnDays, mrp, unitType, quantity);
 	}
 	
 	
@@ -89,10 +92,12 @@ public class ProductController {
 	        @RequestParam(value = "discount", required = false) Double discount,
 	        @RequestParam(value = "returnDays", required = false) Integer returnDays,
 	        @RequestParam(value = "mrp", required = false) Double mrp,
+	        @RequestParam(value = "unit", required = false) UnitType unitType,
+			@RequestParam(value = "quantity", required = false) Double quantity,
 	        @RequestParam(value = "categoryId", required = false) Long categoryId) throws IOException {
 
 	    log.info("Updating product with ID: {}", id);
-	    return productService.updateProduct(id, images, productName, brand, description, discount, returnDays, mrp, categoryId);
+	    return productService.updateProduct(id, images, productName, brand, description, discount, returnDays, mrp, categoryId, unitType, quantity);
 	}
 	
 	

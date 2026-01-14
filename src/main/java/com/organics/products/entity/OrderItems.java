@@ -20,5 +20,8 @@ public class OrderItems {
     private Double price;
     private Double tax;
     private Double discount;
+    @ManyToOne
+    @JoinColumn(name = "order_id")
+    private Order order;
 
 }
