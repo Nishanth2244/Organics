@@ -13,6 +13,9 @@ public class Category {
     private Long id;
 
     private String categoryName;
+    
+    @Lob
+    @Column(columnDefinition = "TEXT")
     private String description;
     private String categoryImage;
     private Boolean status;

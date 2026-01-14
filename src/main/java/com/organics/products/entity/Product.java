@@ -33,6 +33,7 @@ public class Product {
     private Integer returnDays;
     private Double MRP;
     private Boolean status;
+    private Double afterDiscount;
 
     @ManyToOne
     @JoinColumn(name = "category_id")
