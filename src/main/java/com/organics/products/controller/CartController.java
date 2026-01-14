@@ -1,7 +1,9 @@
 package com.organics.products.controller;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -24,12 +26,29 @@ public class CartController {
 	
 	
 	@PostMapping("/addItem")
-	public CartDTO addCart(@RequestBody AddToCartRequest addToCartRequest,
-						@RequestParam Long customerId) {
+	public CartDTO addCart(@RequestBody AddToCartRequest addToCartRequest) {
 		
-		CartDTO cartDTO = cartService.addToCart(addToCartRequest, customerId);
+		CartDTO cartDTO = cartService.addToCart(addToCartRequest);
 		
 		log.info("Item added to cart Succesfully: {}", addToCartRequest.getProductId());
+		return cartDTO;
+	}
+	
+	
+	@GetMapping("/myCart")
+	public CartDTO getCart() {
+		
+		CartDTO cartDTO = cartService.myCart();
+		return cartDTO;
+	}
+	
+	
+	@PutMapping("/decreaseQuantity")
+	public CartDTO decreaseQuantity(@RequestParam Long productId) {
+		
+		CartDTO cartDTO = cartService.decreaseQuantity(productId);
+		
+		log.info("Decreasing the Quantity of item: {}", productId);
 		return cartDTO;
 	}
 
