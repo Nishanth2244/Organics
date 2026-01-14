@@ -37,7 +37,9 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/admin/change-password").hasRole("ADMIN")
                         .requestMatchers(
                                 "/api/auth/**",
-                                "/api/auth/admin/forgot-password/**"
+                                "/api/auth/admin/forgot-password/**",
+                                "/api/products/activeProd",
+                                "/api/products/byCategory"
 
                         ).permitAll()
 

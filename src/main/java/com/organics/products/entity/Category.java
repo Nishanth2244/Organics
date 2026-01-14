@@ -13,6 +13,7 @@ public class Category {
     private Long id;
 
     private String categoryName;
+    @Column(length = 10000)
     private String description;
     private String categoryImage;
     private Boolean status;

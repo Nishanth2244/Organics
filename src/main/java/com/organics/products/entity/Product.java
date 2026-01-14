@@ -34,7 +34,7 @@ public class Product {
     private Double MRP;
     private Boolean status;
     private Double afterDiscount;
-    
+
     @ManyToOne
     @JoinColumn(name = "category_id")
     private Category category;

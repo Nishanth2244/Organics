@@ -44,16 +44,7 @@ public class ProductService {
 		dto.setReturnDays(product.getReturnDays());
 		dto.setMrp(product.getMRP());
 		dto.setStatus(product.getStatus());
-		
-//		if(product.getMRP() != null && product.getDiscount() != null) {
-//			double discountAmount = (product.getMRP() * product.getDiscount())/ 100;
-//			dto.setAfterDiscount(product.getMRP() - discountAmount);
-//		}
-//		else {
-//	        dto.setAfterDiscount(product.getMRP());
-//	    }
-		
-		dto.setAfterDiscount(product.getAfterDiscount()  );
+		dto.setAfterDiscount(product.getAfterDiscount());
 
 		if (product.getCategory() != null) {
 			dto.setCategoryId(product.getCategory().getId());
@@ -86,10 +77,10 @@ public class ProductService {
 		product.setCategory(category);
 		product.setStatus(true);
 		
-		if(mrp != null && discount != null) {
-			product.setAfterDiscount(mrp - (mrp * discount) / 100);
-		}else {
-			product.setAfterDiscount(mrp);
+		if (mrp != null && discount != null) {
+		    product.setAfterDiscount(mrp - (mrp * discount / 100));
+		} else {
+		    product.setAfterDiscount(mrp);
 		}
 
 		Product savedProduct = productRepo.save(product);
@@ -102,12 +93,14 @@ public class ProductService {
 			ProductImage img = new ProductImage();
 			img.setImageUrl(url);
 			img.setProduct(savedProduct);
-
+			
 			imageList.add(img);
 		}
 
 		savedProduct.setImages(imageList);
-		return convertToDTO(savedProduct);
+		Product finalProduct = productRepo.save(savedProduct);
+		
+		return convertToDTO(finalProduct);
 	}
 
 	
@@ -165,6 +158,7 @@ public class ProductService {
 			product.setReturnDays(returnDays);
 		if (mrp != null)
 			product.setMRP(mrp);
+		
 		if (product.getMRP() != null && product.getDiscount() != null) {
 		    product.setAfterDiscount(product.getMRP() - (product.getMRP() * product.getDiscount() / 100));
 		}
