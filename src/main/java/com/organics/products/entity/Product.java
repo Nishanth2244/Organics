@@ -37,7 +37,8 @@ public class Product {
     private Double MRP;
     private Boolean status;
     private Double afterDiscount;
-
+    
+    
     @Enumerated(EnumType.STRING)
     private UnitType unit;
     private Double netWeight;

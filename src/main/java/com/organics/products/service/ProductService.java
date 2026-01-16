@@ -66,7 +66,7 @@ public class ProductService {
 
 
 	public ProductDTO add(Long categoryId, MultipartFile[] images, String productName, String brand, String description,
-						  Double discount, Integer returnDays, Double mrp, UnitType unitType, Double netWeight) throws IOException {
+			Double discount, Integer returnDays, Double mrp, UnitType unitType, Double netWeight) throws IOException {
 
 		Category category = categoryRepo.findById(categoryId)
 				.orElseThrow(() -> new ResourceNotFoundException("Category not found"));
@@ -82,7 +82,7 @@ public class ProductService {
 		product.setStatus(true);
 		product.setUnit(unitType);
 		product.setNetWeight(netWeight);
-
+		
 		if (mrp != null && discount != null) {
 			product.setAfterDiscount(mrp - (mrp * discount / 100));
 		} else {
@@ -147,7 +147,7 @@ public class ProductService {
 
 
 	public Product updateProduct(Long id, MultipartFile[] images, String productName, String brand, String description,
-								 Double discount, Integer returnDays, Double mrp, Long categoryId, UnitType unitType, Double netWeight) throws IOException {
+			Double discount, Integer returnDays, Double mrp, Long categoryId, UnitType unitType, Double netWeight) throws IOException {
 
 		Product product = productRepo.findById(id)
 				.orElseThrow(() -> new ResourceNotFoundException("Product not found with id: " + id));
@@ -164,15 +164,15 @@ public class ProductService {
 			product.setReturnDays(returnDays);
 		if (mrp != null)
 			product.setMRP(mrp);
-
+		
 		if(unitType != null) {
 			product.setUnit(unitType);
 		}
-
+		
 		if(netWeight != null) {
 			product.setNetWeight(netWeight);
 		}
-
+		
 		if (product.getMRP() != null && product.getDiscount() != null) {
 			product.setAfterDiscount(product.getMRP() - (product.getMRP() * product.getDiscount() / 100));
 		}

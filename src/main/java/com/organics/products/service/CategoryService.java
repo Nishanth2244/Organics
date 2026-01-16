@@ -29,11 +29,11 @@ public class CategoryService {
 
 	@Autowired
 	private S3Service s3Service;
-
+	
 	@Autowired
 	private ProductRepo productRepo;
-
-
+	
+	
 	private CategoryDTO convertToDTO(Category category) {
 		CategoryDTO dto = new CategoryDTO();
 		dto.setId(category.getId());
@@ -103,13 +103,13 @@ public class CategoryService {
 				.orElseThrow(() -> new ResourceNotFoundException("category Not Found to Inactive: "+ id));
 
 		category.setStatus(status);
-
+		
 		List<Product> products = productRepo.findByCategoryId(id);
-
+		
 		for (Product product : products) {
-			product.setStatus(status);
+		    product.setStatus(status);
 		}
-
+		
 		categoryRepo.save(category);
 	}
 

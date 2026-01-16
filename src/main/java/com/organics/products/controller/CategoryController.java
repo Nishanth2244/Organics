@@ -70,8 +70,8 @@ public class CategoryController {
 		return category;
 
 	}
-
-
+	
+	
 	@PutMapping("/Status/{id}")
 	public String inActiveCat(@PathVariable Long id,
 							  @RequestParam Boolean status) {
