@@ -1,3 +1,4 @@
+
 package com.organics.products.service;
 
 import java.io.IOException;
@@ -13,6 +14,7 @@ import com.organics.products.dto.ProductDTO;
 import com.organics.products.entity.Category;
 import com.organics.products.entity.Product;
 import com.organics.products.entity.ProductImage;
+import com.organics.products.entity.UnitType;
 import com.organics.products.exception.ResourceNotFoundException;
 import com.organics.products.respository.CategoryRepo;
 import com.organics.products.respository.ProductRepo;
@@ -31,8 +33,8 @@ public class ProductService {
 
 	@Autowired
 	private ProductRepo productRepo;
-	
-	
+
+
 
 	private ProductDTO convertToDTO(Product product) {
 		ProductDTO dto = new ProductDTO();
@@ -45,6 +47,8 @@ public class ProductService {
 		dto.setMrp(product.getMRP());
 		dto.setStatus(product.getStatus());
 		dto.setAfterDiscount(product.getAfterDiscount());
+		dto.setUnit(product.getUnit());
+		dto.setNetWeight(product.getNetWeight());
 
 		if (product.getCategory() != null) {
 			dto.setCategoryId(product.getCategory().getId());
@@ -57,12 +61,12 @@ public class ProductService {
 		}
 		return dto;
 	}
-	
-	
-	
+
+
+
 
 	public ProductDTO add(Long categoryId, MultipartFile[] images, String productName, String brand, String description,
-			Double discount, Integer returnDays, Double mrp) throws IOException {
+						  Double discount, Integer returnDays, Double mrp, UnitType unitType, Double netWeight) throws IOException {
 
 		Category category = categoryRepo.findById(categoryId)
 				.orElseThrow(() -> new ResourceNotFoundException("Category not found"));
@@ -76,11 +80,13 @@ public class ProductService {
 		product.setMRP(mrp);
 		product.setCategory(category);
 		product.setStatus(true);
-		
+		product.setUnit(unitType);
+		product.setNetWeight(netWeight);
+
 		if (mrp != null && discount != null) {
-		    product.setAfterDiscount(mrp - (mrp * discount / 100));
+			product.setAfterDiscount(mrp - (mrp * discount / 100));
 		} else {
-		    product.setAfterDiscount(mrp);
+			product.setAfterDiscount(mrp);
 		}
 
 		Product savedProduct = productRepo.save(product);
@@ -93,18 +99,18 @@ public class ProductService {
 			ProductImage img = new ProductImage();
 			img.setImageUrl(url);
 			img.setProduct(savedProduct);
-			
+
 			imageList.add(img);
 		}
 
 		savedProduct.setImages(imageList);
 		Product finalProduct = productRepo.save(savedProduct);
-		
+
 		return convertToDTO(finalProduct);
 	}
 
-	
-	
+
+
 	public void inActive(Long id, Boolean status) {
 
 		Product product = productRepo.findById(id)
@@ -113,9 +119,9 @@ public class ProductService {
 		product.setStatus(status);
 		productRepo.save(product);
 	}
-	
-	
-	
+
+
+
 
 	public List<ProductDTO> activeProd() {
 
@@ -126,8 +132,8 @@ public class ProductService {
 				.collect(Collectors.toList());
 	}
 
-	
-	
+
+
 	public List<ProductDTO> getInActive() {
 
 		List<Product> products = productRepo.findByStatusFalse();
@@ -136,12 +142,12 @@ public class ProductService {
 				.map(this::convertToDTO)
 				.collect(Collectors.toList());
 	}
-	
-	
-	
+
+
+
 
 	public Product updateProduct(Long id, MultipartFile[] images, String productName, String brand, String description,
-			Double discount, Integer returnDays, Double mrp, Long categoryId) throws IOException {
+								 Double discount, Integer returnDays, Double mrp, Long categoryId, UnitType unitType, Double netWeight) throws IOException {
 
 		Product product = productRepo.findById(id)
 				.orElseThrow(() -> new ResourceNotFoundException("Product not found with id: " + id));
@@ -158,9 +164,17 @@ public class ProductService {
 			product.setReturnDays(returnDays);
 		if (mrp != null)
 			product.setMRP(mrp);
-		
+
+		if(unitType != null) {
+			product.setUnit(unitType);
+		}
+
+		if(netWeight != null) {
+			product.setNetWeight(netWeight);
+		}
+
 		if (product.getMRP() != null && product.getDiscount() != null) {
-		    product.setAfterDiscount(product.getMRP() - (product.getMRP() * product.getDiscount() / 100));
+			product.setAfterDiscount(product.getMRP() - (product.getMRP() * product.getDiscount() / 100));
 		}
 
 		if (categoryId != null) {
@@ -192,8 +206,8 @@ public class ProductService {
 
 		return productRepo.save(product);
 	}
-	
-	
+
+
 
 	public List<ProductDTO> byCategory(Long categoryId) {
 

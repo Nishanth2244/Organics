@@ -1,3 +1,4 @@
+
 package com.organics.products.service;
 
 import java.util.ArrayList;
@@ -69,7 +70,8 @@ public class CartService {
 			itemDTO.setQuantity(qty);
 			itemDTO.setMrp(mrp);
 			itemDTO.setDiscountPercent(product.getDiscount());
-
+			itemDTO.setUnit(product.getUnit());
+			itemDTO.setNetWeight(product.getNetWeight());
 
 			double itemTotalMrp = mrp * qty;
 			double itemFinalPrice = afterDiscount * qty;
@@ -180,36 +182,36 @@ public class CartService {
 		return convertToCartDTO(cart);
 	}
 
-	
-	
+
+
 	public CartDTO decreaseQuantity(Long productId) {
-		
+
 		Long customerId = SecurityUtil.getCurrentUserId()
 				.orElseThrow(() -> new ResourceNotFoundException("User Not authenticated to decrease cart: "));
-		
+
 		User user = customerRepository.findById(customerId)
 				.orElseThrow(() -> new ResourceNotFoundException("User Not Found to decrease cart"));
-		
+
 		Cart cart = cartRepository.findByUserAndIsActive(user, true)
 				.stream().findFirst()
-	            .orElseThrow(() -> new ResourceNotFoundException("Active cart not found"));
-		
-		
+				.orElseThrow(() -> new ResourceNotFoundException("Active cart not found"));
+
+
 		CartItems existingItem = cart.getItems().stream()
-	            .filter(item -> item.getProduct().getId().equals(productId))
-	            .findFirst()
-	            .orElseThrow(() -> new ResourceNotFoundException("Product not found in cart"));
-		
-		
+				.filter(item -> item.getProduct().getId().equals(productId))
+				.findFirst()
+				.orElseThrow(() -> new ResourceNotFoundException("Product not found in cart"));
+
+
 		if (existingItem.getQuantity() > 1) {
-	        existingItem.setQuantity(existingItem.getQuantity() - 1);
-	        cartItemRepository.save(existingItem);
-	    } else {
-	        cart.getItems().remove(existingItem);
-	        cartItemRepository.delete(existingItem);
-	    }
-		
+			existingItem.setQuantity(existingItem.getQuantity() - 1);
+			cartItemRepository.save(existingItem);
+		} else {
+			cart.getItems().remove(existingItem);
+			cartItemRepository.delete(existingItem);
+		}
+
 		Cart updatedCart = cartRepository.save(cart);
-	    return convertToCartDTO(updatedCart);	}
+		return convertToCartDTO(updatedCart);	}
 
 }

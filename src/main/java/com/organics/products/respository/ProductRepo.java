@@ -1,3 +1,4 @@
+
 package com.organics.products.respository;
 
 import java.util.List;
@@ -15,6 +16,5 @@ public interface ProductRepo extends JpaRepository<Product, Long>{
 	List<Product> findByStatusFalse();
 
 	List<Product> findByCategoryId(Long id);
-
 
 }

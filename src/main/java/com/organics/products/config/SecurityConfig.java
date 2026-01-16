@@ -45,11 +45,8 @@ public class SecurityConfig {
                                 "/api/auth/**",
                                 "/api/auth/admin/forgot-password/**",
                                 "/api/products/activeProd",
-                                "/api/products/byCategory"
-
-                        ).permitAll()
-
-                        .requestMatchers(
+                                "/api/products/byCategory",
+                                "/api/category/Active",
                                 "/swagger-ui/**",
                                 "/v3/api-docs/**"
                         ).permitAll()

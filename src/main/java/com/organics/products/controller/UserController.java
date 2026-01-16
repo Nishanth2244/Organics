@@ -27,6 +27,14 @@ public class UserController {
     public void updateDisplayName(@RequestBody UserDTO request) {
         userService.updateDisplayName(request.getDisplayName());
     }
+
+
+
+    @GetMapping("/display-name")
+    public UserDTO getMyDisplayName() {
+        return userService.getMyDisplayName();
+    }
+
     @GetMapping("/getAllUsers")
     public List<UserDTO> getAllUsers() {
         return userService.getAllUsers();

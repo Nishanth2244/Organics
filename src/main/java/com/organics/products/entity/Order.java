@@ -4,28 +4,37 @@ import jakarta.persistence.*;
 import lombok.Data;
 
 import java.time.LocalDate;
+import java.util.List;
 
 @Entity
 @Data
 @Table(name = "order")
 public class Order {
-     @Id
+    @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-     private LocalDate orderDate;
-     private Double orderAmount;
-     private String description;
+    private LocalDate orderDate;
+    private Double orderAmount;
+    private String description;
 
-
-     @Enumerated(EnumType.STRING)
+    @Enumerated(EnumType.STRING)
     private OrderStatus orderStatus;
 
-     @ManyToOne
+    @ManyToOne
     @JoinColumn(name = "cart_id")
     private Cart cart;
 
-     @ManyToOne
+    @ManyToOne
     @JoinColumn(name = "user_id")
     private User user;
+
+    @OneToMany(mappedBy = "order")
+    private List<OrderItems> orderItems;
+
+    @ManyToOne
+    @JoinColumn(name = "address_id")
+    private Address address;
+
+
 }

@@ -1,3 +1,4 @@
+
 package com.organics.products.service;
 
 import java.io.IOException;
@@ -10,9 +11,11 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.organics.products.dto.CategoryDTO;
 import com.organics.products.entity.Category;
+import com.organics.products.entity.Product;
 import com.organics.products.exception.AlreadyExistsException;
 import com.organics.products.exception.ResourceNotFoundException;
 import com.organics.products.respository.CategoryRepo;
+import com.organics.products.respository.ProductRepo;
 
 import lombok.extern.java.Log;
 import lombok.extern.slf4j.Slf4j;
@@ -26,19 +29,22 @@ public class CategoryService {
 
 	@Autowired
 	private S3Service s3Service;
-	
-	
-	private CategoryDTO convertToDTO(Category category) {
-	    CategoryDTO dto = new CategoryDTO();
-	    dto.setId(category.getId());
-	    dto.setCategoryName(category.getCategoryName());
-	    dto.setDescription(category.getDescription());
-	    dto.setStatus(category.getStatus());
 
-	    if (category.getCategoryImage() != null) {
-	        dto.setCategoryImage(s3Service.getFileUrl(category.getCategoryImage()));
-	    }
-	    return dto;
+	@Autowired
+	private ProductRepo productRepo;
+
+
+	private CategoryDTO convertToDTO(Category category) {
+		CategoryDTO dto = new CategoryDTO();
+		dto.setId(category.getId());
+		dto.setCategoryName(category.getCategoryName());
+		dto.setDescription(category.getDescription());
+		dto.setStatus(category.getStatus());
+
+		if (category.getCategoryImage() != null) {
+			dto.setCategoryImage(s3Service.getFileUrl(category.getCategoryImage()));
+		}
+		return dto;
 	}
 
 	public CategoryDTO addCategory(String categoryName, String description, MultipartFile imageFile) throws IOException {
@@ -55,18 +61,18 @@ public class CategoryService {
 		String url = s3Service.uploadFile(imageFile);
 		category.setCategoryImage(url);
 
-		return convertToDTO(categoryRepo.save(category));	
-		}
-	
-	
+		return convertToDTO(categoryRepo.save(category));
+	}
+
+
 
 	public List<CategoryDTO> getActive() {
-	    return categoryRepo.findByStatusTrue().stream()
-	            .map(this::convertToDTO)
-	            .collect(Collectors.toList());
+		return categoryRepo.findByStatusTrue().stream()
+				.map(this::convertToDTO)
+				.collect(Collectors.toList());
 	}
-	
-	
+
+
 
 	public Category updateCategory(Long id, String categoryName, String description, MultipartFile imageFile)
 			throws IOException {
@@ -92,21 +98,28 @@ public class CategoryService {
 	}
 
 	public void inActive(Long id, Boolean status) {
-		
+
 		Category category = categoryRepo.findById(id)
 				.orElseThrow(() -> new ResourceNotFoundException("category Not Found to Inactive: "+ id));
-		
+
 		category.setStatus(status);
+
+		List<Product> products = productRepo.findByCategoryId(id);
+
+		for (Product product : products) {
+			product.setStatus(status);
+		}
+
 		categoryRepo.save(category);
 	}
 
-	
-	
+
+
 	public List<CategoryDTO> getInActive() {
-		
-		 return categoryRepo.findByStatusFalse().stream()
-		            .map(this::convertToDTO)
-		            .collect(Collectors.toList());
+
+		return categoryRepo.findByStatusFalse().stream()
+				.map(this::convertToDTO)
+				.collect(Collectors.toList());
 	}
 
 }

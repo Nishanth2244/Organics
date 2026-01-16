@@ -25,4 +25,8 @@ public interface AddressRepository extends JpaRepository<Address, Long> {
 @Transactional
 @Query("update Address a set a.isPrimary=false where a.user.id=:userId")
 void clearPrimary(Long userId);
+
+    Optional<Address> findFirstByUserIdOrderByIdAsc(Long userId);
+
+    boolean existsByUserIdAndIsPrimaryTrue(Long userId);
 }

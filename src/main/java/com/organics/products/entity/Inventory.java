@@ -4,38 +4,45 @@ import jakarta.persistence.*;
 import lombok.Data;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Entity
+@Table(
+        name = "inventory",
+        uniqueConstraints = {
+                @UniqueConstraint(columnNames = {"product_id", "branch_id"})
+        }
+)
 @Data
-@Table(name = "inventory")
 public class Inventory {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne
+    @ManyToOne(optional = false)
     @JoinColumn(name = "product_id")
     private Product product;
 
-//    @ManyToOne
-//    @JoinColumn(name = "orderitem_id")
-//    private OrderItems orderItems;
-
-    @ManyToOne
+    @ManyToOne(optional = false)
     @JoinColumn(name = "branch_id")
     private Branch branch;
 
-    private LocalDate updatedDate;
+    private Integer availableStock;
+    private Integer reservedStock;
 
-    private Integer stock;
+    private LocalDateTime updatedAt;
 
-    @OneToMany(mappedBy = "inventory", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
+    @OneToMany(
+            mappedBy = "inventory",
+            cascade = CascadeType.ALL,
+            orphanRemoval = true
+    )
     private List<InventoryTransactions> inventoryTransactions;
 
-
-
-
-
+    @PreUpdate
+    void onUpdate() {
+        this.updatedAt = LocalDateTime.now();
+    }
 }

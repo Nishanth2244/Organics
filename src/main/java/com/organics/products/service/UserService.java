@@ -103,4 +103,20 @@ public class UserService {
 
 
 
+
+    public UserDTO getMyDisplayName() {
+
+        Long userId = SecurityUtil.getCurrentUserId()
+                .orElseThrow(() -> new RuntimeException("Unauthorized"));
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        UserDTO dto = new UserDTO();
+        dto.setId(user.getId());
+        dto.setDisplayName(user.getDisplayName());
+
+        return dto;
+    }
+
 }

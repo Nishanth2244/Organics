@@ -4,28 +4,35 @@ import jakarta.persistence.*;
 import lombok.Data;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
-@Data
 @Entity
 @Table(name = "inventory_transactions")
+@Data
 public class InventoryTransactions {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne
-    @JoinColumn(name = "product_id")
-    private Product product;
-
-    @ManyToOne
+    @ManyToOne(optional = false)
     @JoinColumn(name = "inventory_id")
     private Inventory inventory;
 
-    private String transactionType;
-    private Integer quantity;
-    private String referenceType;
-    private Long referenceId;
-    private LocalDate transactionDate;
+    @Enumerated(EnumType.STRING)
+    private InventoryTransactionType transactionType;
 
+    private Integer quantity;
+
+    @Enumerated(EnumType.STRING)
+    private InventoryReferenceType referenceType;
+
+    private Long referenceId;
+
+    private LocalDateTime transactionDate;
+
+    @PrePersist
+    void onCreate() {
+        this.transactionDate = LocalDateTime.now();
+    }
 }

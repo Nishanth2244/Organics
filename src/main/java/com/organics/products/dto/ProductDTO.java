@@ -1,7 +1,10 @@
+
 package com.organics.products.dto;
 
 import lombok.Data;
 import java.util.List;
+
+import com.organics.products.entity.UnitType;
 
 @Data
 public class ProductDTO {
@@ -15,5 +18,7 @@ public class ProductDTO {
     private Double discount;
     private Boolean status;
     private Long categoryId;
-    private List<String> imageUrls; 
+    private UnitType unit;
+    private Double netWeight;
+    private List<String> imageUrls;
 }

@@ -7,23 +7,35 @@ import lombok.Data;
 import java.util.List;
 
 @Entity
+@Table(
+        name = "branch",
+        uniqueConstraints = {
+                @UniqueConstraint(columnNames = "branch_code")
+        }
+)
 @Data
-@Table(name = "branch")
 public class Branch {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
     private String branchName;
     private String branchCode;
-    private Double latitude;
-    private Double lognitude;
+
     private String location;
+    private String pincode;
+
+    private Double latitude;
+    private Double longitude;
     private Double chargePerKm;
 
-    @OneToMany
+    private Boolean active = true;
 
-    private List<Inventory> inventory;
-
-
-
+    @OneToMany(
+            mappedBy = "branch",
+            cascade = CascadeType.ALL,
+            orphanRemoval = true
+    )
+    private List<Inventory> inventories;
 }

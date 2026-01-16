@@ -3,6 +3,8 @@ package com.organics.products.entity;
 import jakarta.persistence.*;
 import lombok.Data;
 
+
+
 @Entity
 @Data
 @Table(name = "wishlistitems")
