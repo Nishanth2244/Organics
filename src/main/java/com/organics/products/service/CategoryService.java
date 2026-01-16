@@ -10,9 +10,11 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.organics.products.dto.CategoryDTO;
 import com.organics.products.entity.Category;
+import com.organics.products.entity.Product;
 import com.organics.products.exception.AlreadyExistsException;
 import com.organics.products.exception.ResourceNotFoundException;
 import com.organics.products.respository.CategoryRepo;
+import com.organics.products.respository.ProductRepo;
 
 import lombok.extern.java.Log;
 import lombok.extern.slf4j.Slf4j;
@@ -26,6 +28,9 @@ public class CategoryService {
 
 	@Autowired
 	private S3Service s3Service;
+	
+	@Autowired
+	private ProductRepo productRepo;
 	
 	
 	private CategoryDTO convertToDTO(Category category) {
@@ -97,6 +102,13 @@ public class CategoryService {
 				.orElseThrow(() -> new ResourceNotFoundException("category Not Found to Inactive: "+ id));
 		
 		category.setStatus(status);
+		
+		List<Product> products = productRepo.findByCategoryId(id);
+		
+		for (Product product : products) {
+		    product.setStatus(status);
+		}
+		
 		categoryRepo.save(category);
 	}
 

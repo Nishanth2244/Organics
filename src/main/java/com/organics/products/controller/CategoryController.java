@@ -71,7 +71,7 @@ public class CategoryController {
 	}
 	
 	
-	@PutMapping("/inActive/{id}")
+	@PutMapping("/Status/{id}")
 	public String inActiveCat(@PathVariable Long id,
 								@RequestParam Boolean status) {
 		categoryService.inActive(id, status);

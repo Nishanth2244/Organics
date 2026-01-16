@@ -39,7 +39,7 @@ public class Product {
     
     @Enumerated(EnumType.STRING)
     private UnitType unit;
-    private Double quantity;
+    private Double netWeight;
 
     @ManyToOne
     @JoinColumn(name = "category_id")

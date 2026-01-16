@@ -18,6 +18,6 @@ public class ProductDTO {
     private Boolean status;
     private Long categoryId;
     private UnitType unit;
-    private Double quantity;
+    private Double netWeight;
     private List<String> imageUrls; 
 }

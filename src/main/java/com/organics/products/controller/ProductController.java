@@ -45,10 +45,10 @@ public class ProductController {
 			@RequestParam(value = "discount", required = false) Double discount,
 			@RequestParam(value = "returnDays", required = false) Integer returnDays,
 			@RequestParam(value = "unit", required = false) UnitType unitType,
-			@RequestParam(value = "quantity", required = false) Double quantity,
+			@RequestParam(value = "netWeight", required = false) Double netWeight,
 			@RequestParam(value = "mrp", required = false) Double mrp) throws IOException {
 
-		return productService.add(categoryId, images, productName, brand, description, discount, returnDays, mrp, unitType, quantity);
+		return productService.add(categoryId, images, productName, brand, description, discount, returnDays, mrp, unitType, netWeight);
 	}
 	
 	
@@ -93,11 +93,11 @@ public class ProductController {
 	        @RequestParam(value = "returnDays", required = false) Integer returnDays,
 	        @RequestParam(value = "mrp", required = false) Double mrp,
 	        @RequestParam(value = "unit", required = false) UnitType unitType,
-			@RequestParam(value = "quantity", required = false) Double quantity,
+			@RequestParam(value = "netWeight", required = false) Double netWeight,
 	        @RequestParam(value = "categoryId", required = false) Long categoryId) throws IOException {
 
 	    log.info("Updating product with ID: {}", id);
-	    return productService.updateProduct(id, images, productName, brand, description, discount, returnDays, mrp, categoryId, unitType, quantity);
+	    return productService.updateProduct(id, images, productName, brand, description, discount, returnDays, mrp, categoryId, unitType, netWeight);
 	}
 	
 	

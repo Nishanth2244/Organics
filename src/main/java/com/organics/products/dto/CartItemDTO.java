@@ -1,5 +1,7 @@
 package com.organics.products.dto;
 
+import com.organics.products.entity.UnitType;
+
 import lombok.Data;
 
 
@@ -16,4 +18,6 @@ public class CartItemDTO {
     private Double discountAmount;  
     private Double finalPrice;      
     private String imageUrl;
+    private UnitType unit;
+    private Double netWeight;
 }

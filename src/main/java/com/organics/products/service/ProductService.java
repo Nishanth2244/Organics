@@ -47,7 +47,7 @@ public class ProductService {
 		dto.setStatus(product.getStatus());
 		dto.setAfterDiscount(product.getAfterDiscount());
 		dto.setUnit(product.getUnit());
-		dto.setQuantity(product.getQuantity());
+		dto.setNetWeight(product.getNetWeight());
 
 		if (product.getCategory() != null) {
 			dto.setCategoryId(product.getCategory().getId());
@@ -65,7 +65,7 @@ public class ProductService {
 	
 
 	public ProductDTO add(Long categoryId, MultipartFile[] images, String productName, String brand, String description,
-			Double discount, Integer returnDays, Double mrp, UnitType unitType, Double quantity) throws IOException {
+			Double discount, Integer returnDays, Double mrp, UnitType unitType, Double netWeight) throws IOException {
 
 		Category category = categoryRepo.findById(categoryId)
 				.orElseThrow(() -> new ResourceNotFoundException("Category not found"));
@@ -80,7 +80,7 @@ public class ProductService {
 		product.setCategory(category);
 		product.setStatus(true);
 		product.setUnit(unitType);
-		product.setQuantity(quantity);
+		product.setNetWeight(netWeight);
 		
 		if (mrp != null && discount != null) {
 		    product.setAfterDiscount(mrp - (mrp * discount / 100));
@@ -146,7 +146,7 @@ public class ProductService {
 	
 
 	public Product updateProduct(Long id, MultipartFile[] images, String productName, String brand, String description,
-			Double discount, Integer returnDays, Double mrp, Long categoryId, UnitType unitType, Double quantity) throws IOException {
+			Double discount, Integer returnDays, Double mrp, Long categoryId, UnitType unitType, Double netWeight) throws IOException {
 
 		Product product = productRepo.findById(id)
 				.orElseThrow(() -> new ResourceNotFoundException("Product not found with id: " + id));
@@ -168,8 +168,8 @@ public class ProductService {
 			product.setUnit(unitType);
 		}
 		
-		if(quantity != null) {
-			product.setQuantity(quantity);
+		if(netWeight != null) {
+			product.setNetWeight(netWeight);
 		}
 		
 		if (product.getMRP() != null && product.getDiscount() != null) {

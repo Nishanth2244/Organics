@@ -69,8 +69,9 @@ public class CartService {
 			itemDTO.setQuantity(qty);
 			itemDTO.setMrp(mrp);
 			itemDTO.setDiscountPercent(product.getDiscount());
-
-
+			itemDTO.setUnit(product.getUnit());
+			itemDTO.setNetWeight(product.getNetWeight());
+			
 			double itemTotalMrp = mrp * qty;
 			double itemFinalPrice = afterDiscount * qty;
 			double itemDiscountAmount = itemTotalMrp - itemFinalPrice;
