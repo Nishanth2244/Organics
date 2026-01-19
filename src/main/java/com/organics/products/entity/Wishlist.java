@@ -4,7 +4,9 @@ import jakarta.persistence.*;
 import jakarta.websocket.OnError;
 import lombok.Data;
 
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 @Data
 @Entity
@@ -19,7 +21,7 @@ public class Wishlist {
     @JoinColumn(name = "user_id")
     private User user;
 
-    @OneToMany(mappedBy = "wishlist", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
-    private List<WishListItems> wishListItems;
+    @OneToMany(mappedBy = "wishlist", cascade = CascadeType.ALL, orphanRemoval = true)
+    private Set<WishListItems> wishListItems = new HashSet<>();
 
 }

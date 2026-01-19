@@ -1,4 +1,3 @@
-
 package com.organics.products.entity;
 
 import java.util.List;
@@ -31,13 +30,11 @@ public class Product {
     private String productName;
     private String brand;
     private String description;
-    private Double discount;
     private Integer returnDays;
     private Double MRP;
     private Boolean status;
-    private Double afterDiscount;
-    
-    
+
+
     @Enumerated(EnumType.STRING)
     private UnitType unit;
     private Double netWeight;
@@ -49,4 +46,7 @@ public class Product {
     @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
     @JsonManagedReference
     private List<ProductImage> images;
+
+    @OneToMany(mappedBy = "product")
+    private List<Inventory> inventories;
 }

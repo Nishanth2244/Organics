@@ -21,12 +21,12 @@ public class Inventory {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne(optional = false)
-    @JoinColumn(name = "product_id")
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "product_id", nullable = false)
     private Product product;
 
-    @ManyToOne(optional = false)
-    @JoinColumn(name = "branch_id")
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "branch_id", nullable = false)
     private Branch branch;
 
     private Integer availableStock;
@@ -43,6 +43,11 @@ public class Inventory {
 
     @PreUpdate
     void onUpdate() {
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    @PrePersist
+    void onCreate() {
         this.updatedAt = LocalDateTime.now();
     }
 }
