@@ -6,6 +6,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+import com.organics.products.entity.*;
+import com.organics.products.respository.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -13,15 +15,7 @@ import com.organics.products.config.SecurityUtil;
 import com.organics.products.dto.AddToCartRequest;
 import com.organics.products.dto.CartDTO;
 import com.organics.products.dto.CartItemDTO;
-import com.organics.products.entity.Cart;
-import com.organics.products.entity.CartItems;
-import com.organics.products.entity.Product;
-import com.organics.products.entity.User;
 import com.organics.products.exception.ResourceNotFoundException;
-import com.organics.products.respository.CartItemRepository;
-import com.organics.products.respository.CartRepository;
-import com.organics.products.respository.ProductRepo;
-import com.organics.products.respository.UserRepository;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -37,6 +31,12 @@ public class CartService {
 
 	@Autowired
 	private ProductRepo productRepo;
+
+	@Autowired
+	private InventoryRepository inventoryRepository;
+
+	@Autowired
+	private InventoryService inventoryService;
 
 	@Autowired
 	private CartItemRepository cartItemRepository;
@@ -134,22 +134,30 @@ public class CartService {
 				.orElseThrow(() -> new RuntimeException("User not authenticated"));
 
 		User customer = customerRepository.findById(customerId)
-				.orElseThrow(() -> new ResourceNotFoundException("User not Found to add Items to cart: " + customerId));
+				.orElseThrow(() -> new ResourceNotFoundException("User not Found"));
 
 		Cart cart = getOrCreateActiveCart(customer);
 
 		Product product = productRepo.findById(addToCartRequest.getProductId())
-				.orElseThrow(() -> new ResourceNotFoundException(
-						"Product Not found to add to Cart: " + addToCartRequest.getProductId()));
+				.orElseThrow(() -> new ResourceNotFoundException("Product Not found"));
+
+		Inventory inventory = inventoryRepository.findByProductId(product.getId())
+				.orElseThrow(() -> new RuntimeException("Inventory not found"));
+
+		inventoryService.reserveStock(
+				inventory.getId(),
+				addToCartRequest.getQuantity(),
+				null
+		);
 
 		Optional<CartItems> existingItem = cart.getItems().stream()
-				.filter(item -> item.getProduct().getId().equals(addToCartRequest.getProductId())).findFirst();
+				.filter(item -> item.getProduct().getId().equals(product.getId()))
+				.findFirst();
 
 		if (existingItem.isPresent()) {
 			CartItems item = existingItem.get();
 			item.setQuantity(item.getQuantity() + addToCartRequest.getQuantity());
 			cartItemRepository.save(item);
-
 		} else {
 			CartItems newItem = new CartItems();
 			newItem.setCart(cart);
@@ -157,17 +165,12 @@ public class CartService {
 			newItem.setQuantity(addToCartRequest.getQuantity());
 			cart.getItems().add(newItem);
 			cartItemRepository.save(newItem);
-			;
 		}
-
-		double total = cart.getItems().stream().mapToDouble(item -> item.getProduct().getMRP() * item.getQuantity())
-				.sum();
-
-		cart.setTotalAmount(total);
 
 		Cart savedCart = cartRepository.save(cart);
 		return convertToCartDTO(savedCart);
 	}
+
 
 	public CartDTO myCart() {
 
@@ -202,14 +205,22 @@ public class CartService {
 				.findFirst()
 				.orElseThrow(() -> new ResourceNotFoundException("Product not found in cart"));
 
+		Inventory inventory = inventoryRepository.findByProductId(productId)
+				.orElseThrow(() -> new RuntimeException("Inventory not found"));
 
 		if (existingItem.getQuantity() > 1) {
 			existingItem.setQuantity(existingItem.getQuantity() - 1);
 			cartItemRepository.save(existingItem);
+
+			inventoryService.releaseStock(inventory.getId(), 1, null);
+
 		} else {
 			cart.getItems().remove(existingItem);
 			cartItemRepository.delete(existingItem);
+
+			inventoryService.releaseStock(inventory.getId(), 1, null);
 		}
+
 
 		Cart updatedCart = cartRepository.save(cart);
 		return convertToCartDTO(updatedCart);	}
