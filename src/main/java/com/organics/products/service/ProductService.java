@@ -12,11 +12,13 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.organics.products.dto.ProductDTO;
 import com.organics.products.entity.Category;
+import com.organics.products.entity.Inventory;
 import com.organics.products.entity.Product;
 import com.organics.products.entity.ProductImage;
 import com.organics.products.entity.UnitType;
 import com.organics.products.exception.ResourceNotFoundException;
 import com.organics.products.respository.CategoryRepo;
+import com.organics.products.respository.InventoryRepository;
 import com.organics.products.respository.ProductRepo;
 
 import lombok.extern.slf4j.Slf4j;
@@ -34,6 +36,8 @@ public class ProductService {
 	@Autowired
 	private ProductRepo productRepo;
 
+	@Autowired
+	private InventoryRepository inventoryRepository;
 
 
 	private ProductDTO convertToDTO(Product product) {
@@ -59,6 +63,12 @@ public class ProductService {
 					.collect(Collectors.toList());
 			dto.setImageUrls(urls);
 		}
+		
+		List<Inventory> inventories = inventoryRepository.findByProductId(product.getId());
+	    if (!inventories.isEmpty()) {
+	        dto.setInventoryId(inventories.get(0).getId()); // First branch inventory ID
+	        dto.setAvailableStock(inventories.get(0).getAvailableStock());
+	    }
 		return dto;
 	}
 

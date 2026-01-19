@@ -10,6 +10,7 @@ public class CartItemDTO {
 
     private Long id;
     private Long productId;
+    private Long inventoryId;
     private String productName;
     private Integer quantity;
     private Double mrp;

@@ -2,6 +2,7 @@ package com.organics.products.controller;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -30,7 +31,7 @@ public class CartController {
 		
 		CartDTO cartDTO = cartService.addToCart(addToCartRequest);
 		
-		log.info("Item added to cart Succesfully: {}", addToCartRequest.getProductId());
+		log.info("Item added to cart Succesfully: {}");
 		return cartDTO;
 	}
 	
@@ -44,11 +45,18 @@ public class CartController {
 	
 	
 	@PutMapping("/decreaseQuantity")
-	public CartDTO decreaseQuantity(@RequestParam Long productId) {
+	public CartDTO decreaseQuantity(@RequestParam Long inventoryId) {
+		CartDTO cartDTO = cartService.decreaseQuantity(inventoryId);
 		
-		CartDTO cartDTO = cartService.decreaseQuantity(productId);
+		log.info("Decreasing the Quantity of item: {}", inventoryId);
+		return cartDTO;
+	}
+	
+	
+	@PostMapping("/applyCoupon/{couponId}")
+	public CartDTO applyCoupon(@PathVariable Long couponId) {
 		
-		log.info("Decreasing the Quantity of item: {}", productId);
+		CartDTO cartDTO = cartService.applyCoupon(couponId);
 		return cartDTO;
 	}
 
