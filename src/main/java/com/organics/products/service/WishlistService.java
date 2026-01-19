@@ -119,8 +119,6 @@ public class WishlistService {
 
         r.setReturnDays(product.getReturnDays());
         r.setMrp(product.getMRP());
-        r.setAfterDiscount(product.getAfterDiscount());
-        r.setDiscount(product.getDiscount());
         r.setStatus(product.getStatus());
 
         if (product.getCategory() != null) {

@@ -6,7 +6,9 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.ToString;
 
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 @Entity
@@ -29,7 +31,11 @@ public class Cart {
     @JoinColumn(name = "user_id")
     private User user;
     
-    @ManyToOne
-    @JoinColumn(name = "coupon_id")
-    private Coupon coupon;
+
+    @OneToMany(mappedBy = "cart", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<CartCoupon> appliedCoupons = new ArrayList<>();
+    
+    private Double payableAmount;
+    
+    private Double discountAmount;
 }

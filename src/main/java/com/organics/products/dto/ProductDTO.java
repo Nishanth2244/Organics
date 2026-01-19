@@ -14,8 +14,6 @@ public class ProductDTO {
     private String description;
     private Integer returnDays;
     private Double mrp;
-    private Double afterDiscount;
-    private Double discount;
     private Boolean status;
     private Long categoryId;
     private UnitType unit;

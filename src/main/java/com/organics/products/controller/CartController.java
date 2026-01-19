@@ -53,11 +53,10 @@ public class CartController {
 	}
 	
 	
-	@PostMapping("/applyCoupon/{couponId}")
-	public CartDTO applyCoupon(@PathVariable Long couponId) {
-		
-		CartDTO cartDTO = cartService.applyCoupon(couponId);
-		return cartDTO;
+	@PostMapping("/applyCoupon")
+	public CartDTO applyCoupon(@RequestParam Long couponId) {
+	    log.info("Applying coupon ID: {} to cart", couponId);
+	    return cartService.applyCoupon(couponId);
 	}
 
 }

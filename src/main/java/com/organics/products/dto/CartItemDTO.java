@@ -14,10 +14,6 @@ public class CartItemDTO {
     private String productName;
     private Integer quantity;
     private Double mrp;
-    private Double discountPercent;
-    private Double itemTotalMrp;
-    private Double discountAmount;
-    private Double finalPrice;
     private String imageUrl;
     private UnitType unit;
     private Double netWeight;

@@ -15,8 +15,10 @@ import com.organics.products.dto.AddToCartRequest;
 import com.organics.products.dto.CartDTO;
 import com.organics.products.dto.CartItemDTO;
 import com.organics.products.entity.Cart;
+import com.organics.products.entity.CartCoupon;
 import com.organics.products.entity.CartItems;
 import com.organics.products.entity.Coupon;
+import com.organics.products.entity.DiscountType;
 import com.organics.products.entity.Inventory;
 import com.organics.products.entity.Product;
 import com.organics.products.entity.User;
@@ -51,19 +53,21 @@ public class CartService {
 
 	@Autowired
 	private InventoryRepository inventoryRepository;
-	
+
 	@Autowired
 	private CouponRepository couponRepository;
 
 	private CartDTO convertToCartDTO(Cart cart) {
 		CartDTO dto = new CartDTO();
+
 		dto.setId(cart.getId());
-		dto.setActive(cart.isActive()); 
+		dto.setActive(cart.isActive());
+		dto.setPayableAmount(cart.getPayableAmount());
 		dto.setCustomerId(cart.getUser().getId());
 
-		double cartTotalMrp = 0.0;
-		double cartTotalDiscount = 0.0;
-		double cartPayableAmount = 0.0;
+		dto.setTotalMrp(cart.getTotalAmount() != null ? cart.getTotalAmount() : 0.0);
+	    dto.setTotalDiscount(cart.getDiscountAmount() != null ? cart.getDiscountAmount() : 0.0);
+	    dto.setPayableAmount(cart.getPayableAmount() != null ? cart.getPayableAmount() : 0.0);
 
 		List<CartItemDTO> itemDTOs = new ArrayList<>();
 
@@ -74,11 +78,8 @@ public class CartService {
 			int qty = item.getQuantity();
 
 			double mrp = product.getMRP() != null ? product.getMRP() : 0.0;
-			double afterDiscount = product.getAfterDiscount() != null ? product.getAfterDiscount() : mrp;
 
 			double itemTotalMrp = mrp * qty;
-			double itemFinalPrice = afterDiscount * qty;
-			double itemDiscountAmount = itemTotalMrp - itemFinalPrice;
 
 			CartItemDTO itemDTO = new CartItemDTO();
 			itemDTO.setId(item.getId());
@@ -87,13 +88,8 @@ public class CartService {
 			itemDTO.setProductName(product.getProductName());
 			itemDTO.setQuantity(qty);
 			itemDTO.setMrp(mrp);
-			itemDTO.setDiscountPercent(product.getDiscount());
 			itemDTO.setUnit(product.getUnit());
 			itemDTO.setNetWeight(product.getNetWeight());
-
-			itemDTO.setItemTotalMrp(itemTotalMrp);
-			itemDTO.setDiscountAmount(itemDiscountAmount);
-			itemDTO.setFinalPrice(itemFinalPrice);
 
 			if (product.getImages() != null && !product.getImages().isEmpty()) {
 				itemDTO.setImageUrl(s3Service.getFileUrl(product.getImages().get(0).getImageUrl()));
@@ -101,20 +97,10 @@ public class CartService {
 
 			itemDTOs.add(itemDTO);
 
-			cartTotalMrp += itemTotalMrp;
-			cartTotalDiscount += itemDiscountAmount;
-			cartPayableAmount += itemFinalPrice;
 		}
-
 		dto.setItems(itemDTOs);
-		dto.setTotalMrp(cartTotalMrp);
-		dto.setTotalDiscount(cartTotalDiscount);
-		dto.setPayableAmount(cartPayableAmount);
-
-		return dto;
+	    return dto;
 	}
-	
-	
 
 	private Cart getOrCreateActiveCart(User customer) {
 
@@ -143,8 +129,6 @@ public class CartService {
 			return cart;
 		}
 	}
-	
-	
 
 	public CartDTO addToCart(AddToCartRequest request) {
 
@@ -182,22 +166,29 @@ public class CartService {
 			newItem.setCart(cart);
 			newItem.setInventory(inventory);
 			newItem.setQuantity(request.getQuantity());
-			newItem.setInventory(inventory);
 			cart.getItems().add(newItem);
 			cartItemRepository.save(newItem);
 
 		}
 
-		double total = cart.getItems().stream()
-				.mapToDouble(item -> item.getInventory().getProduct().getMRP() * item.getQuantity()).sum();
+		double totalMrp = 0.0;
+		double totalPayable = 0.0;
 
-		cart.setTotalAmount(total);
+		for (CartItems item : cart.getItems()) {
+			Product product = item.getInventory().getProduct();
+			int qty = item.getQuantity();
+
+			double mrp = product.getMRP() != null ? product.getMRP() : 0.0;
+
+			totalMrp += (mrp * qty);
+		}
+
+		cart.setTotalAmount(totalMrp);
+		cart.setPayableAmount(totalPayable);
 
 		Cart savedCart = cartRepository.save(cart);
 		return convertToCartDTO(savedCart);
 	}
-	
-	
 
 	public CartDTO myCart() {
 
@@ -211,9 +202,6 @@ public class CartService {
 
 		return convertToCartDTO(cart);
 	}
-	
-	
-	
 
 	public CartDTO decreaseQuantity(Long inventoryId) {
 
@@ -241,42 +229,49 @@ public class CartService {
 		Cart updatedCart = cartRepository.save(cart);
 		return convertToCartDTO(updatedCart);
 	}
-
-
+	
+	
 
 	public CartDTO applyCoupon(Long couponId) {
-		
-		Long userId = SecurityUtil.getCurrentUserId()
+	    Long userId = SecurityUtil.getCurrentUserId()
 	            .orElseThrow(() -> new RuntimeException("Unauthorized"));
-		
-		User user = customerRepository.findById(userId)
-				.orElseThrow(() -> new ResourceNotFoundException("User not found with id: "+ userId));
-		
-		Cart cart = getOrCreateActiveCart(user);
-		
-		Coupon coupon = couponRepository.findById(couponId)
-				.orElseThrow(() -> new ResourceNotFoundException("Coupon not found with id: "+ couponId));
-		
-		if(!coupon.isActive()) {
-			throw new RuntimeException("This coupon is currently inactive");
-		}
-		
-		if (coupon.getExpiryDate() != null && coupon.getExpiryDate().isBefore(LocalDate.now())) {
-	        throw new RuntimeException("Coupon has expired");
-	    }
-		
-		double currentSubTotal = cart.getItems().stream()
-	            .mapToDouble(item -> item.getInventory().getProduct().getAfterDiscount() * item.getQuantity())
-	            .sum();
-		
-		if (currentSubTotal < coupon.getMinOrderAmount()) {
-	        throw new RuntimeException("Add more items! Minimum order amount for this coupon is: " + coupon.getMinOrderAmount());
-	    }
-		
-		cart.setCoupon(coupon);
-	    Cart savedCart = cartRepository.save(cart);
 
-	    return convertToCartDTO(savedCart);
+	    User user = customerRepository.findById(userId)
+	            .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+	    Cart cart = getOrCreateActiveCart(user);
+
+	    Coupon coupon = couponRepository.findById(couponId)
+	            .orElseThrow(() -> new ResourceNotFoundException("Coupon not found"));
+
+	    if (!coupon.isActive()) throw new RuntimeException("Coupon is inactive");
+	    if (coupon.getEndDate() != null && coupon.getEndDate().isBefore(LocalDate.now())) 
+	        throw new RuntimeException("Coupon expired");
+
+	    double totalAmount = cart.getTotalAmount();
+	    if (coupon.getMinOrderAmount() != null && totalAmount < coupon.getMinOrderAmount())
+	        throw new RuntimeException("Minimum amount required: " + coupon.getMinOrderAmount());
+
+	    double discount = 0.0;
+	    if (coupon.getDiscountType() == DiscountType.PERCENT) {
+	        discount = (totalAmount * coupon.getDiscountValue()) / 100;
+	        if (coupon.getMaxDiscountAmount() != null && discount > coupon.getMaxDiscountAmount()) {
+	            discount = coupon.getMaxDiscountAmount();
+	        }
+	    } else {
+	        discount = coupon.getDiscountValue();
+	    }
+
+	    cart.setDiscountAmount(discount);
+	    cart.setPayableAmount(totalAmount - discount);
+
+	    CartCoupon cartCoupon = new CartCoupon();
+	    cartCoupon.setCart(cart);
+	    cartCoupon.setCoupon(coupon);
+	    cart.getAppliedCoupons().add(cartCoupon); 
+
+	    cartRepository.save(cart);
+	    return convertToCartDTO(cart);
 	}
 
 }
