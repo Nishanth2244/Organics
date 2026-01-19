@@ -1,5 +1,6 @@
 package com.organics.products.service;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -9,105 +10,91 @@ import org.springframework.stereotype.Service;
 import com.organics.products.dto.CouponDTO;
 import com.organics.products.dto.CreateCouponRequest;
 import com.organics.products.entity.Coupon;
+import com.organics.products.entity.DiscountType;
 import com.organics.products.exception.ResourceNotFoundException;
 import com.organics.products.respository.CouponRepository;
 
 @Service
 public class CouponService {
-	
-	
+
 	@Autowired
 	private CouponRepository couponRepository;
-	
-	public CouponDTO converToDTO(Coupon coupon) {
-		
-		CouponDTO couponDTO = new CouponDTO();
-		couponDTO.setId(coupon.getId());
-		couponDTO.setActive(coupon.isActive());
-		couponDTO.setCode(coupon.getCode());
-		couponDTO.setDiscountPercentage(coupon.getDiscountPercentage());
-		couponDTO.setExpiryDate(coupon.getExpiryDate());
-		couponDTO.setMaxDiscountAmount(coupon.getMaxDiscountAmount());
-		couponDTO.setMinOrderAmount(coupon.getMinOrderAmount());
-		
-		return couponDTO;
-	}
-	
-	
 
-	public CouponDTO createCoupon(CreateCouponRequest createCouponRequest) {
-		
+	public CouponDTO converToDTO(Coupon coupon) {
+		CouponDTO dto = new CouponDTO();
+		dto.setId(coupon.getId());
+		dto.setCode(coupon.getCode());
+		dto.setDescription(coupon.getDescription());
+		dto.setDiscountType(coupon.getDiscountType());
+		dto.setDiscountValue(coupon.getDiscountValue());
+		dto.setMinOrderAmount(coupon.getMinOrderAmount());
+		dto.setMaxDiscountAmount(coupon.getMaxDiscountAmount());
+		dto.setUsageLimit(coupon.getUsageLimit());
+		dto.setUsedCount(coupon.getUsedCount());
+		dto.setStartDate(coupon.getStartDate());
+		dto.setEndDate(coupon.getEndDate());
+		dto.setActive(coupon.isActive());
+		return dto;
+	}
+
+	public CouponDTO createCoupon(CreateCouponRequest req) {
 		Coupon coupon = new Coupon();
-		coupon.setActive(createCouponRequest.isActive());
-		coupon.setCode(createCouponRequest.getCode());
-		coupon.setDiscountPercentage(createCouponRequest.getDiscountPercentage());
-		coupon.setExpiryDate(createCouponRequest.getExpiryDate());
-		coupon.setMaxDiscountAmount(createCouponRequest.getMaxDiscountAmount());
-		coupon.setMinOrderAmount(createCouponRequest.getMinOrderAmount());
-		
+		coupon.setCode(req.getCode());
+		coupon.setDescription(req.getDescription());
+		coupon.setDiscountType(req.getDiscountType());
+		coupon.setDiscountValue(req.getDiscountValue());
+		coupon.setMinOrderAmount(req.getMinOrderAmount());
+		coupon.setMaxDiscountAmount(req.getMaxDiscountAmount());
+		coupon.setUsageLimit(req.getUsageLimit());
+		coupon.setStartDate(req.getStartDate());
+		coupon.setEndDate(req.getEndDate());
+		coupon.setActive(req.isActive());
+		coupon.setUsedCount(0); 
+
 		Coupon savedCoupon = couponRepository.save(coupon);
 		return converToDTO(savedCoupon);
 	}
 
-
-
 	public List<CouponDTO> getActive() {
-
-	    return couponRepository.findByIsActiveTrue()
-	            .stream()
-	            .map(this::converToDTO)
-	            .collect(Collectors.toList());
+		return couponRepository.findByIsActiveTrue().stream().map(this::converToDTO).collect(Collectors.toList());
 	}
-
-
 
 	public List<CouponDTO> getInActive() {
-		
-		return couponRepository.findByIsActiveFalse()
-	            .stream()
-	            .map(this::converToDTO)
-	            .collect(Collectors.toList());
-				
-		
+		return couponRepository.findByIsActiveFalse().stream().map(this::converToDTO).collect(Collectors.toList());
 	}
-
-
 
 	public void setStatus(Boolean status, Long id) {
-		
 		Coupon coupon = couponRepository.findById(id)
-				.orElseThrow(() -> new ResourceNotFoundException("Coupon Not Found to change status"));
-		
+				.orElseThrow(() -> new ResourceNotFoundException("Coupon Not Found"));
 		coupon.setActive(status);
 		couponRepository.save(coupon);
-		
 	}
 
+	public void updateExtended(Long id, String code, String description, DiscountType type, Double val, Double minAmt,
+			Double maxAmt, Integer limit, LocalDate start, LocalDate end) {
 
-
-	public void update(Long id, String code, Double discountPerc, Double maxDiscountAm,
-			Double minOrderAmt) {
-		
 		Coupon coupon = couponRepository.findById(id)
-				.orElseThrow(() -> new ResourceNotFoundException("Coupon Not found to Update: "+ id));
-		
-		if(code != null) {
-			coupon.setCode(code);
-		}
-		if(discountPerc != null) {
-			coupon.setDiscountPercentage(discountPerc);
-		}
-		
-		if(maxDiscountAm != null) {
-			coupon.setMaxDiscountAmount(maxDiscountAm);
-		}
-		
-		if(minOrderAmt != null) {
-			coupon.setMinOrderAmount(minOrderAmt);
-		}
-		
-		couponRepository.save(coupon);
-		 
-	}
+				.orElseThrow(() -> new ResourceNotFoundException("Coupon Not found to Update: " + id));
 
+		if (code != null)
+			coupon.setCode(code);
+		if (description != null)
+			coupon.setDescription(description);
+		if (type != null)
+			coupon.setDiscountType(type);
+		if (val != null)
+			coupon.setDiscountValue(val);
+		if (minAmt != null)
+			coupon.setMinOrderAmount(minAmt);
+		if (maxAmt != null)
+			coupon.setMaxDiscountAmount(maxAmt);
+		if (limit != null)
+			coupon.setUsageLimit(limit);
+		if (start != null)
+			coupon.setStartDate(start);
+		if (end != null)
+			coupon.setEndDate(end);
+
+		couponRepository.save(coupon);
+	}
 }

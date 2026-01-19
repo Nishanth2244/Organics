@@ -23,4 +23,6 @@ public class WishlistProductResponse {
 
     private Long categoryId;
     private List<String> imageUrls;
+    private Long inventoryId;
+    private Integer availableStock;
 }

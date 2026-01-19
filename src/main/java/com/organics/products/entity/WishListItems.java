@@ -22,4 +22,18 @@ public class WishListItems {
     @JoinColumn(name = "wishlist_id")
     private Wishlist wishlist;
 
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof WishListItems)) return false;
+        WishListItems that = (WishListItems) o;
+        return id != null && id.equals(that.id);
+    }
+
+    @Override
+    public int hashCode() {
+        return getClass().hashCode();
+    }
+
+
 }

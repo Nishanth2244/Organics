@@ -1,6 +1,6 @@
-
 package com.organics.products.service;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -14,12 +14,18 @@ import com.organics.products.dto.AddToCartRequest;
 import com.organics.products.dto.CartDTO;
 import com.organics.products.dto.CartItemDTO;
 import com.organics.products.entity.Cart;
+import com.organics.products.entity.CartCoupon;
 import com.organics.products.entity.CartItems;
+import com.organics.products.entity.Coupon;
+import com.organics.products.entity.DiscountType;
+import com.organics.products.entity.Inventory;
 import com.organics.products.entity.Product;
 import com.organics.products.entity.User;
 import com.organics.products.exception.ResourceNotFoundException;
 import com.organics.products.respository.CartItemRepository;
 import com.organics.products.respository.CartRepository;
+import com.organics.products.respository.CouponRepository;
+import com.organics.products.respository.InventoryRepository;
 import com.organics.products.respository.ProductRepo;
 import com.organics.products.respository.UserRepository;
 
@@ -44,42 +50,45 @@ public class CartService {
 	@Autowired
 	private S3Service s3Service;
 
+	@Autowired
+	private InventoryRepository inventoryRepository;
+
+	@Autowired
+	private CouponRepository couponRepository;
+
 	private CartDTO convertToCartDTO(Cart cart) {
 		CartDTO dto = new CartDTO();
+
 		dto.setId(cart.getId());
-		dto.setActive(cart.isActive()); // Use current status
+		dto.setActive(cart.isActive());
+		dto.setPayableAmount(cart.getPayableAmount());
 		dto.setCustomerId(cart.getUser().getId());
 
-		double cartTotalMrp = 0.0;
-		double cartTotalDiscount = 0.0;
-		double cartPayableAmount = 0.0;
+		dto.setTotalMrp(cart.getTotalAmount() != null ? cart.getTotalAmount() : 0.0);
+	    dto.setTotalDiscount(cart.getDiscountAmount() != null ? cart.getDiscountAmount() : 0.0);
+	    dto.setPayableAmount(cart.getPayableAmount() != null ? cart.getPayableAmount() : 0.0);
 
 		List<CartItemDTO> itemDTOs = new ArrayList<>();
 
 		for (CartItems item : cart.getItems()) {
-			Product product = item.getProduct();
+
+			Inventory inventory = item.getInventory();
+			Product product = inventory.getProduct();
 			int qty = item.getQuantity();
 
 			double mrp = product.getMRP() != null ? product.getMRP() : 0.0;
-			double afterDiscount = product.getAfterDiscount() != null ? product.getAfterDiscount() : mrp;
+
+			double itemTotalMrp = mrp * qty;
 
 			CartItemDTO itemDTO = new CartItemDTO();
 			itemDTO.setId(item.getId());
 			itemDTO.setProductId(product.getId());
+			itemDTO.setInventoryId(inventory.getId());
 			itemDTO.setProductName(product.getProductName());
 			itemDTO.setQuantity(qty);
 			itemDTO.setMrp(mrp);
-			itemDTO.setDiscountPercent(product.getDiscount());
 			itemDTO.setUnit(product.getUnit());
 			itemDTO.setNetWeight(product.getNetWeight());
-			
-			double itemTotalMrp = mrp * qty;
-			double itemFinalPrice = afterDiscount * qty;
-			double itemDiscountAmount = itemTotalMrp - itemFinalPrice;
-
-			itemDTO.setItemTotalMrp(itemTotalMrp);
-			itemDTO.setDiscountAmount(itemDiscountAmount);
-			itemDTO.setFinalPrice(itemFinalPrice);
 
 			if (product.getImages() != null && !product.getImages().isEmpty()) {
 				itemDTO.setImageUrl(s3Service.getFileUrl(product.getImages().get(0).getImageUrl()));
@@ -87,17 +96,9 @@ public class CartService {
 
 			itemDTOs.add(itemDTO);
 
-			cartTotalMrp += itemTotalMrp;
-			cartTotalDiscount += itemDiscountAmount;
-			cartPayableAmount += itemFinalPrice;
 		}
-
 		dto.setItems(itemDTOs);
-		dto.setTotalMrp(cartTotalMrp);
-		dto.setTotalDiscount(cartTotalDiscount);
-		dto.setPayableAmount(cartPayableAmount);
-
-		return dto;
+	    return dto;
 	}
 
 	private Cart getOrCreateActiveCart(User customer) {
@@ -128,7 +129,7 @@ public class CartService {
 		}
 	}
 
-	public CartDTO addToCart(AddToCartRequest addToCartRequest) {
+	public CartDTO addToCart(AddToCartRequest request) {
 
 		Long customerId = SecurityUtil.getCurrentUserId()
 				.orElseThrow(() -> new RuntimeException("User not authenticated"));
@@ -138,32 +139,62 @@ public class CartService {
 
 		Cart cart = getOrCreateActiveCart(customer);
 
-		Product product = productRepo.findById(addToCartRequest.getProductId())
-				.orElseThrow(() -> new ResourceNotFoundException(
-						"Product Not found to add to Cart: " + addToCartRequest.getProductId()));
+		Inventory inventory = inventoryRepository.findById(request.getInventoryId())
+				.orElseThrow(() -> new ResourceNotFoundException("Inventory not found: " + request.getInventoryId()));
 
+		if (inventory.getAvailableStock() < request.getQuantity()) {
+			throw new RuntimeException("Insufficient stock");
+		}
 		Optional<CartItems> existingItem = cart.getItems().stream()
-				.filter(item -> item.getProduct().getId().equals(addToCartRequest.getProductId())).findFirst();
+				.filter(item -> item.getInventory().getId().equals(request.getInventoryId())).findFirst();
 
 		if (existingItem.isPresent()) {
+
 			CartItems item = existingItem.get();
-			item.setQuantity(item.getQuantity() + addToCartRequest.getQuantity());
+			int newQty = item.getQuantity() + request.getQuantity();
+
+			if (inventory.getAvailableStock() < newQty) {
+				throw new RuntimeException("Insufficient stock for requested quantity");
+			}
+
+			item.setQuantity(newQty);
 			cartItemRepository.save(item);
 
 		} else {
 			CartItems newItem = new CartItems();
 			newItem.setCart(cart);
-			newItem.setProduct(product);
-			newItem.setQuantity(addToCartRequest.getQuantity());
+			newItem.setInventory(inventory);
+			newItem.setQuantity(request.getQuantity());
 			cart.getItems().add(newItem);
 			cartItemRepository.save(newItem);
 
 		}
 
-		double total = cart.getItems().stream().mapToDouble(item -> item.getProduct().getMRP() * item.getQuantity())
-				.sum();
+		double totalMrp = 0.0;
+		double totalPayable = 0.0;
 
-		cart.setTotalAmount(total);
+		for (CartItems item : cart.getItems()) {
+			Product product = item.getInventory().getProduct();
+			int qty = item.getQuantity();
+
+			double mrp = product.getMRP() != null ? product.getMRP() : 0.0;
+
+			totalMrp += (mrp * qty);
+		}
+		double totalMrp = 0.0;
+		double totalPayable = 0.0;
+
+		for (CartItems item : cart.getItems()) {
+			Product product = item.getInventory().getProduct();
+			int qty = item.getQuantity();
+
+			double mrp = product.getMRP() != null ? product.getMRP() : 0.0;
+
+			totalMrp += (mrp * qty);
+		}
+
+		cart.setTotalAmount(totalMrp);
+		cart.setPayableAmount(totalPayable);
 
 		Cart savedCart = cartRepository.save(cart);
 		return convertToCartDTO(savedCart);
@@ -182,9 +213,7 @@ public class CartService {
 		return convertToCartDTO(cart);
 	}
 
-
-
-	public CartDTO decreaseQuantity(Long productId) {
+	public CartDTO decreaseQuantity(Long inventoryId) {
 
 		Long customerId = SecurityUtil.getCurrentUserId()
 				.orElseThrow(() -> new ResourceNotFoundException("User Not authenticated to decrease cart: "));
@@ -192,16 +221,12 @@ public class CartService {
 		User user = customerRepository.findById(customerId)
 				.orElseThrow(() -> new ResourceNotFoundException("User Not Found to decrease cart"));
 
-		Cart cart = cartRepository.findByUserAndIsActive(user, true)
-				.stream().findFirst()
+		Cart cart = cartRepository.findByUserAndIsActive(user, true).stream().findFirst()
 				.orElseThrow(() -> new ResourceNotFoundException("Active cart not found"));
 
-
 		CartItems existingItem = cart.getItems().stream()
-				.filter(item -> item.getProduct().getId().equals(productId))
-				.findFirst()
+				.filter(item -> item.getInventory().getId().equals(inventoryId)).findFirst()
 				.orElseThrow(() -> new ResourceNotFoundException("Product not found in cart"));
-
 
 		if (existingItem.getQuantity() > 1) {
 			existingItem.setQuantity(existingItem.getQuantity() - 1);
@@ -212,6 +237,51 @@ public class CartService {
 		}
 
 		Cart updatedCart = cartRepository.save(cart);
-		return convertToCartDTO(updatedCart);	}
+		return convertToCartDTO(updatedCart);
+	}
+	
+	
+
+	public CartDTO applyCoupon(Long couponId) {
+	    Long userId = SecurityUtil.getCurrentUserId()
+	            .orElseThrow(() -> new RuntimeException("Unauthorized"));
+
+	    User user = customerRepository.findById(userId)
+	            .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+	    Cart cart = getOrCreateActiveCart(user);
+
+	    Coupon coupon = couponRepository.findById(couponId)
+	            .orElseThrow(() -> new ResourceNotFoundException("Coupon not found"));
+
+	    if (!coupon.isActive()) throw new RuntimeException("Coupon is inactive");
+	    if (coupon.getEndDate() != null && coupon.getEndDate().isBefore(LocalDate.now())) 
+	        throw new RuntimeException("Coupon expired");
+
+	    double totalAmount = cart.getTotalAmount();
+	    if (coupon.getMinOrderAmount() != null && totalAmount < coupon.getMinOrderAmount())
+	        throw new RuntimeException("Minimum amount required: " + coupon.getMinOrderAmount());
+
+	    double discount = 0.0;
+	    if (coupon.getDiscountType() == DiscountType.PERCENT) {
+	        discount = (totalAmount * coupon.getDiscountValue()) / 100;
+	        if (coupon.getMaxDiscountAmount() != null && discount > coupon.getMaxDiscountAmount()) {
+	            discount = coupon.getMaxDiscountAmount();
+	        }
+	    } else {
+	        discount = coupon.getDiscountValue();
+	    }
+
+	    cart.setDiscountAmount(discount);
+	    cart.setPayableAmount(totalAmount - discount);
+
+	    CartCoupon cartCoupon = new CartCoupon();
+	    cartCoupon.setCart(cart);
+	    cartCoupon.setCoupon(coupon);
+	    cart.getAppliedCoupons().add(cartCoupon); 
+
+	    cartRepository.save(cart);
+	    return convertToCartDTO(cart);
+	}
 
 }

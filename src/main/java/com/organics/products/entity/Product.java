@@ -1,7 +1,5 @@
-
 package com.organics.products.entity;
 
-import java.math.BigDecimal;
 import java.util.List;
 
 import com.fasterxml.jackson.annotation.JsonManagedReference;
@@ -32,11 +30,9 @@ public class Product {
     private String productName;
     private String brand;
     private String description;
-    private Double discount;
     private Integer returnDays;
     private Double MRP;
     private Boolean status;
-    private Double afterDiscount;
     
     
     @Enumerated(EnumType.STRING)
@@ -46,8 +42,11 @@ public class Product {
     @ManyToOne
     @JoinColumn(name = "category_id")
     private Category category;
-
+   
     @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
     @JsonManagedReference
     private List<ProductImage> images;
+    
+    @OneToMany(mappedBy = "product")
+    private List<Inventory> inventories;
 }

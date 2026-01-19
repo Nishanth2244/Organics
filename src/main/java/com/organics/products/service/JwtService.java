@@ -30,9 +30,7 @@ public class JwtService {
         );
     }
 
-
     public String generateAccessToken(Long userId, String role) {
-
         return Jwts.builder()
                 .setSubject(String.valueOf(userId))
                 .claim("role", role)
@@ -44,7 +42,6 @@ public class JwtService {
                 .compact();
     }
 
-
     public boolean validateToken(String token) {
         try {
             parseClaims(token);
@@ -54,18 +51,13 @@ public class JwtService {
         }
     }
 
-
     public Long extractUserId(String token) {
-        return Long.valueOf(
-                parseClaims(token).getSubject()
-        );
+        return Long.valueOf(parseClaims(token).getSubject());
     }
-
 
     public String extractRole(String token) {
         return parseClaims(token).get("role", String.class);
     }
-
 
     private Claims parseClaims(String token) {
         return Jwts.parserBuilder()

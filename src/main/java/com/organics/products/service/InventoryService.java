@@ -8,6 +8,7 @@ import jakarta.transaction.Transactional;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @Transactional
@@ -80,7 +81,6 @@ public class InventoryService {
                 .toList();
     }
 
-    // 4️⃣ GET BY PRODUCT
     public List<InventoryResponse> getInventoryByProduct(Long productId) {
 
         return inventoryRepository.findByProductId(productId)
@@ -89,7 +89,6 @@ public class InventoryService {
                 .toList();
     }
 
-    // 5️⃣ RESERVE STOCK
     public void reserveStock(Long inventoryId, Integer quantity, Long orderId) {
 
         Inventory inventory = inventoryRepository.findById(inventoryId)
@@ -108,7 +107,6 @@ public class InventoryService {
                 quantity, InventoryReferenceType.ORDER, orderId);
     }
 
-    // 6️⃣ CONFIRM STOCK
     public void confirmStock(Long inventoryId, Integer quantity, Long orderId) {
 
         Inventory inventory = inventoryRepository.findById(inventoryId)
@@ -124,7 +122,6 @@ public class InventoryService {
                 quantity, InventoryReferenceType.ORDER, orderId);
     }
 
-    // 7️⃣ RELEASE STOCK
     public void releaseStock(Long inventoryId, Integer quantity, Long orderId) {
 
         Inventory inventory = inventoryRepository.findById(inventoryId)
@@ -143,14 +140,12 @@ public class InventoryService {
                 quantity, InventoryReferenceType.ORDER, orderId);
     }
 
-    // 8️⃣ TRANSACTIONS
     public List<InventoryTransactions> getInventoryTransactions(Long inventoryId) {
 
         return transactionRepository
                 .findByInventoryIdOrderByTransactionDateDesc(inventoryId);
     }
 
-    // 🔹 TRANSACTION LOGGER
     private void saveTransaction(
             Inventory inventory,
             InventoryTransactionType type,
@@ -167,7 +162,6 @@ public class InventoryService {
         transactionRepository.save(tx);
     }
 
-    // 🔹 MAPPER
     private InventoryResponse mapToResponse(Inventory inventory) {
 
         InventoryResponse r = new InventoryResponse();
@@ -178,4 +172,13 @@ public class InventoryService {
         r.setReservedStock(inventory.getReservedStock());
         return r;
     }
+
+
+    public List<InventoryResponse> getAllInventory() {
+        return inventoryRepository.findAll()
+                .stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+    }
+
 }
