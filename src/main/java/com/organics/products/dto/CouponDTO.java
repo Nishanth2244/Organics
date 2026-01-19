@@ -1,4 +1,3 @@
-
 package com.organics.products.dto;
 
 import lombok.Data;

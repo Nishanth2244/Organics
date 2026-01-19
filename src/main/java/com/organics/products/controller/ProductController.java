@@ -40,14 +40,14 @@ public class ProductController {
 
 								 @RequestPart("images") MultipartFile[] images,
 
-								 @RequestParam(value = "productName", required = false) String productName,
-								 @RequestParam(value = "brand", required = false) String brand,
-								 @RequestParam(value = "description", required = false) String description,
-								 @RequestParam(value = "discount", required = false) Double discount,
-								 @RequestParam(value = "returnDays", required = false) Integer returnDays,
-								 @RequestParam(value = "unit", required = false) UnitType unitType,
-								 @RequestParam(value = "netWeight", required = false) Double netWeight,
-								 @RequestParam(value = "mrp", required = false) Double mrp) throws IOException {
+			@RequestParam(value = "productName", required = false) String productName,
+			@RequestParam(value = "brand", required = false) String brand,
+			@RequestParam(value = "description", required = false) String description,
+			@RequestParam(value = "discount", required = false) Double discount,
+			@RequestParam(value = "returnDays", required = false) Integer returnDays,
+			@RequestParam(value = "unit", required = false) UnitType unitType,
+			@RequestParam(value = "netWeight", required = false) Double netWeight,
+			@RequestParam(value = "mrp", required = false) Double mrp) throws IOException {
 
 		return productService.add(categoryId, images, productName, brand, description, discount, returnDays, mrp, unitType, netWeight);
 	}
@@ -86,19 +86,19 @@ public class ProductController {
 
 	@PutMapping(value = "/update/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
 	public Product updateProduct(@PathVariable Long id,
-								 @RequestPart(value = "images", required = false) MultipartFile[] images,
-								 @RequestParam(value = "productName", required = false) String productName,
-								 @RequestParam(value = "brand", required = false) String brand,
-								 @RequestParam(value = "description", required = false) String description,
-								 @RequestParam(value = "discount", required = false) Double discount,
-								 @RequestParam(value = "returnDays", required = false) Integer returnDays,
-								 @RequestParam(value = "mrp", required = false) Double mrp,
-								 @RequestParam(value = "unit", required = false) UnitType unitType,
-								 @RequestParam(value = "netWeight", required = false) Double netWeight,
-								 @RequestParam(value = "categoryId", required = false) Long categoryId) throws IOException {
+	        @RequestPart(value = "images", required = false) MultipartFile[] images,
+	        @RequestParam(value = "productName", required = false) String productName,
+	        @RequestParam(value = "brand", required = false) String brand,
+	        @RequestParam(value = "description", required = false) String description,
+	        @RequestParam(value = "discount", required = false) Double discount,
+	        @RequestParam(value = "returnDays", required = false) Integer returnDays,
+	        @RequestParam(value = "mrp", required = false) Double mrp,
+	        @RequestParam(value = "unit", required = false) UnitType unitType,
+			@RequestParam(value = "netWeight", required = false) Double netWeight,
+	        @RequestParam(value = "categoryId", required = false) Long categoryId) throws IOException {
 
-		log.info("Updating product with ID: {}", id);
-		return productService.updateProduct(id, images, productName, brand, description, discount, returnDays, mrp, categoryId, unitType, netWeight);
+	    log.info("Updating product with ID: {}", id);
+	    return productService.updateProduct(id, images, productName, brand, description, discount, returnDays, mrp, categoryId, unitType, netWeight);
 	}
 
 

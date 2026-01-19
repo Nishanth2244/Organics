@@ -1,4 +1,3 @@
-
 package com.organics.products.entity;
 
 import jakarta.persistence.*;
