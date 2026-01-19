@@ -30,7 +30,6 @@ public class InventoryService {
         this.transactionRepository = transactionRepository;
     }
 
-    // 1️⃣ CREATE INVENTORY
     public InventoryResponse createInventory(InventoryCreateRequest request) {
 
         if (inventoryRepository.existsByProductIdAndBranchId(
@@ -58,7 +57,6 @@ public class InventoryService {
         return mapToResponse(saved);
     }
 
-    // 2️⃣ ADD STOCK
     public void addStock(Long inventoryId, Integer quantity) {
 
         Inventory inventory = inventoryRepository.findById(inventoryId)
@@ -74,7 +72,6 @@ public class InventoryService {
                 quantity, InventoryReferenceType.ADMIN, null);
     }
 
-    // 3️⃣ GET BY BRANCH
     public List<InventoryResponse> getInventoryByBranch(Long branchId) {
 
         return inventoryRepository.findByBranchId(branchId)

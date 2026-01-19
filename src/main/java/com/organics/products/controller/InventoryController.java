@@ -19,7 +19,6 @@ public class InventoryController {
         this.inventoryService = inventoryService;
     }
 
-    // 1️⃣ CREATE INVENTORY
     @PostMapping
     public ResponseEntity<InventoryResponse> createInventory(
             @RequestBody InventoryCreateRequest request
@@ -37,7 +36,6 @@ public class InventoryController {
         return ResponseEntity.noContent().build();
     }
 
-    // 3️⃣ GET INVENTORY BY BRANCH
     @GetMapping("/branch/{branchId}")
     public ResponseEntity<List<InventoryResponse>> getInventoryByBranch(
             @PathVariable Long branchId
@@ -47,7 +45,6 @@ public class InventoryController {
         );
     }
 
-    // 4️⃣ GET INVENTORY BY PRODUCT
     @GetMapping("/product/{productId}")
     public ResponseEntity<List<InventoryResponse>> getInventoryByProduct(
             @PathVariable Long productId
@@ -57,7 +54,6 @@ public class InventoryController {
         );
     }
 
-    // 5️⃣ RESERVE STOCK (Order placed / cart)
     @PostMapping("/{inventoryId}/reserve")
     public ResponseEntity<Void> reserveStock(
             @PathVariable Long inventoryId,
@@ -68,7 +64,6 @@ public class InventoryController {
         return ResponseEntity.noContent().build();
     }
 
-    // 6️⃣ CONFIRM STOCK (Payment success)
     @PostMapping("/{inventoryId}/confirm")
     public ResponseEntity<Void> confirmStock(
             @PathVariable Long inventoryId,
@@ -79,7 +74,6 @@ public class InventoryController {
         return ResponseEntity.noContent().build();
     }
 
-    // 7️⃣ RELEASE STOCK (Cancel / payment failed)
     @PostMapping("/{inventoryId}/release")
     public ResponseEntity<Void> releaseStock(
             @PathVariable Long inventoryId,
@@ -90,7 +84,7 @@ public class InventoryController {
         return ResponseEntity.noContent().build();
     }
 
-    // 8️⃣ INVENTORY TRANSACTIONS (Audit)
+    //  INVENTORY TRANSACTIONS (Audit)
     @GetMapping("/{inventoryId}/transactions")
     public ResponseEntity<List<InventoryTransactions>> getInventoryTransactions(
             @PathVariable Long inventoryId

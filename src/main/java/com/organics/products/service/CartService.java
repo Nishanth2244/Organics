@@ -157,7 +157,7 @@ public class CartService {
 			newItem.setQuantity(addToCartRequest.getQuantity());
 			cart.getItems().add(newItem);
 			cartItemRepository.save(newItem);
-			;
+
 		}
 
 		double total = cart.getItems().stream().mapToDouble(item -> item.getProduct().getMRP() * item.getQuantity())
