@@ -84,4 +84,11 @@ public class BranchService {
         return mapToResponse(updated);
     }
 
+    public List<BranchResponse> getBranchesByStatus(Boolean active) {
+        return branchRepository.findByActive(active)
+                .stream()
+                .map(this::mapToResponse)
+                .toList();
+    }
+
 }

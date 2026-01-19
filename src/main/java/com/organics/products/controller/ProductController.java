@@ -1,4 +1,3 @@
-
 package com.organics.products.controller;
 
 import java.io.IOException;
@@ -107,12 +106,10 @@ public class ProductController {
 		List<ProductDTO> products = productService.byCategory(categoryId);
 		return products;
 	}
-	
 	@GetMapping("/search")
 	public List<ProductDTO> search(@RequestParam String name){
 		List<ProductDTO> products = productService.searchByName(name);
 		log.info("searching by name {}", name);
 		return products;
 	}
-
 }

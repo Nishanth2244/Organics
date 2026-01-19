@@ -1,5 +1,6 @@
 package com.organics.products.entity;
 
 public enum DiscountType {
-	PERCENT, FLAT
+    PERCENTAGE,
+    FLAT
 }

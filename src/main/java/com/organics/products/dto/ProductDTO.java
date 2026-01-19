@@ -1,6 +1,6 @@
-
 package com.organics.products.dto;
 
+import com.organics.products.entity.DiscountType;
 import lombok.Data;
 import java.util.List;
 
@@ -18,7 +18,11 @@ public class ProductDTO {
     private Long categoryId;
     private UnitType unit;
     private Double netWeight;
-    private List<String> imageUrls; 
-    private Long inventoryId; 
+    private List<String> imageUrls;
+    private Long inventoryId;
     private Integer availableStock;
+
+    private Double finalPrice;
+    private Double discountAmount;
+    private DiscountType discountType;
 }

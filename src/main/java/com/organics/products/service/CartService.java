@@ -1,4 +1,3 @@
-
 package com.organics.products.service;
 
 import java.time.LocalDate;
@@ -171,6 +170,17 @@ public class CartService {
 
 		}
 
+		double totalMrp = 0.0;
+		double totalPayable = 0.0;
+
+		for (CartItems item : cart.getItems()) {
+			Product product = item.getInventory().getProduct();
+			int qty = item.getQuantity();
+
+			double mrp = product.getMRP() != null ? product.getMRP() : 0.0;
+
+			totalMrp += (mrp * qty);
+		}
 		double totalMrp = 0.0;
 		double totalPayable = 0.0;
 

@@ -11,7 +11,6 @@ import com.organics.products.respository.OtpRepository;
 import com.organics.products.respository.RefreshTokenRepository;
 import com.organics.products.respository.UserRepository;
 import jakarta.transaction.Transactional;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -31,9 +30,6 @@ public class AuthService {
     private final SmsService smsService;
     private final PasswordEncoder passwordEncoder;
 
-    @Value("${jwt.refresh-token.expiration}")
-    private long refreshTokenExpiryMs;
-
     public AuthService(
             UserRepository userRepository,
             AdminRepository adminRepository,
@@ -52,9 +48,7 @@ public class AuthService {
         this.passwordEncoder = passwordEncoder;
     }
 
-
     public void sendOtp(String phoneNumber) {
-
         if (phoneNumber == null || phoneNumber.isBlank()) {
             throw new RuntimeException("Phone number is required");
         }
@@ -71,15 +65,11 @@ public class AuthService {
 
         otpRepository.save(otpStore);
 
-        String message =
-                "Your JJR Organics OTP is " + otp +
-                        ". It is valid for 3 minutes. Do not share this OTP with anyone.";
-
+        String message = "Your JJR Organics OTP is " + otp + ". It is valid for 3 minutes.";
         smsService.sendOtpSms(phoneNumber, message);
     }
 
     public TokenPair verifyOtp(String phoneNumber, String otp) {
-
         OtpStore store = otpRepository
                 .findTopByPhoneNumberOrderByCreatedAtDesc(phoneNumber)
                 .orElseThrow(() -> new RuntimeException("OTP not sent"));
@@ -109,16 +99,14 @@ public class AuthService {
         user.setLastLogin(LocalDateTime.now());
         userRepository.save(user);
 
-        refreshTokenRepository.deleteByUserId(user.getId());
+        // REMOVED: refreshTokenRepository.deleteByUserId(user.getId());
+        // Removing this line allows the user to stay logged in on multiple devices indefinitely.
 
         return issueUserTokens(user);
     }
 
-
     public TokenPair adminLogin(String email, String password) {
-
-        if (email == null || email.isBlank() ||
-                password == null || password.isBlank()) {
+        if (email == null || email.isBlank() || password == null || password.isBlank()) {
             throw new RuntimeException("Email and password are required");
         }
 
@@ -132,16 +120,12 @@ public class AuthService {
         admin.setLastLogin(LocalDateTime.now());
         adminRepository.save(admin);
 
-        refreshTokenRepository.deleteByAdminId(admin.getId());
+        // REMOVED: refreshTokenRepository.deleteByAdminId(admin.getId());
 
         return issueAdminTokens(admin);
     }
 
-    // =====================================================
-    // REFRESH TOKEN
-    // =====================================================
     public TokenPair refresh(String refreshToken) {
-
         RefreshToken token = refreshTokenRepository.findByToken(refreshToken)
                 .orElseThrow(() -> new RuntimeException("Invalid refresh token"));
 
@@ -156,30 +140,20 @@ public class AuthService {
         return issueAdminTokens(token.getAdmin());
     }
 
-    // =====================================================
-    // LOGOUT
-    // =====================================================
     public void logout(String refreshToken) {
         refreshTokenRepository.findByToken(refreshToken)
                 .ifPresent(refreshTokenRepository::delete);
     }
 
-    // =====================================================
-    // TOKEN GENERATION
-    // =====================================================
     private TokenPair issueUserTokens(User user) {
-
-        String accessToken =
-                jwtService.generateAccessToken(user.getId(), "USER");
-
+        String accessToken = jwtService.generateAccessToken(user.getId(), "USER");
         String refreshToken = UUID.randomUUID().toString();
 
         RefreshToken token = new RefreshToken();
         token.setToken(refreshToken);
         token.setUser(user);
-        token.setExpiryTime(
-                LocalDateTime.now().plusSeconds(refreshTokenExpiryMs / 1000)
-        );
+        // Set expiry to 10 years to effectively keep the user logged in until manual logout
+        token.setExpiryTime(LocalDateTime.now().plusYears(10));
 
         refreshTokenRepository.save(token);
 
@@ -187,34 +161,26 @@ public class AuthService {
     }
 
     private TokenPair issueAdminTokens(Admin admin) {
-
-        String accessToken =
-                jwtService.generateAccessToken(admin.getId(), "ADMIN");
-
+        String accessToken = jwtService.generateAccessToken(admin.getId(), "ADMIN");
         String refreshToken = UUID.randomUUID().toString();
 
         RefreshToken token = new RefreshToken();
         token.setToken(refreshToken);
         token.setAdmin(admin);
-        token.setExpiryTime(
-                LocalDateTime.now().plusSeconds(refreshTokenExpiryMs / 1000)
-        );
+        // Set expiry to 10 years to effectively keep the admin logged in until manual logout
+        token.setExpiryTime(LocalDateTime.now().plusYears(10));
 
         refreshTokenRepository.save(token);
 
         return new TokenPair(accessToken, refreshToken);
     }
 
-    // =====================================================
-    // OTP GENERATOR
-    // =====================================================
     private String generateOtp() {
         SecureRandom random = new SecureRandom();
         return String.valueOf(100000 + random.nextInt(900000));
     }
 
     public void changePassword(String oldPassword, String newPassword) {
-
         Long adminId = SecurityUtil.getCurrentUserId()
                 .orElseThrow(() -> new RuntimeException("Admin not authenticated"));
 
@@ -227,109 +193,67 @@ public class AuthService {
 
         admin.setPassword(passwordEncoder.encode(newPassword));
         admin.setLastLogin(LocalDateTime.now());
-
         adminRepository.save(admin);
 
         refreshTokenRepository.deleteByAdminId(admin.getId());
     }
 
     public void sendAdminForgotPasswordOtp(String email, String phoneNumber) {
-
-        if ((email == null && phoneNumber == null) ||
-                (email != null && phoneNumber != null)) {
+        if ((email == null && phoneNumber == null) || (email != null && phoneNumber != null)) {
             throw new RuntimeException("Provide either email or phone number");
         }
 
         Admin admin;
         String otp = generateOtp();
-        String message =
-                "Admin Password Reset OTP: " + otp +
-                        ". Valid for 3 minutes.";
 
         if (email != null) {
             admin = adminRepository.findByEmail(email)
                     .orElseThrow(() -> new RuntimeException("Admin not found"));
-
             otpRepository.deleteByPhoneNumber(admin.getPhoneNumber());
-
-            OtpStore store = new OtpStore();
-            store.setPhoneNumber(admin.getPhoneNumber());
-            store.setOtp(otp);
-            store.setExpiryTime(LocalDateTime.now().plusMinutes(3));
-            store.setVerified(false);
-            otpRepository.save(store);
-
-            smsService.sendOtpEmail(
-                    "arn:aws:sns:ap-southeast-1:xxxx:admin-forgot-password-topic",
-                    otp
-            );
-            return;
+        } else {
+            admin = adminRepository.findByPhoneNumber(phoneNumber)
+                    .orElseThrow(() -> new RuntimeException("Admin not found"));
+            otpRepository.deleteByPhoneNumber(phoneNumber);
         }
 
-        admin = adminRepository.findByPhoneNumber(phoneNumber)
-                .orElseThrow(() -> new RuntimeException("Admin not found"));
-
-        otpRepository.deleteByPhoneNumber(phoneNumber);
-
         OtpStore store = new OtpStore();
-        store.setPhoneNumber(phoneNumber);
+        store.setPhoneNumber(admin.getPhoneNumber());
         store.setOtp(otp);
         store.setExpiryTime(LocalDateTime.now().plusMinutes(3));
         store.setVerified(false);
         otpRepository.save(store);
 
-        smsService.sendOtpSms(phoneNumber, message);
+        if (email != null) {
+            smsService.sendOtpEmail("arn:aws:sns:ap-southeast-1:xxxx:admin-forgot-password-topic", otp);
+        } else {
+            smsService.sendOtpSms(phoneNumber, "Admin Password Reset OTP: " + otp + ". Valid for 3 minutes.");
+        }
     }
-    public void resetAdminPassword(
-            String email,
-            String phoneNumber,
-            String otp,
-            String newPassword
-    ) {
 
-        if ((email == null && phoneNumber == null) ||
-                (email != null && phoneNumber != null)) {
+    public void resetAdminPassword(String email, String phoneNumber, String otp, String newPassword) {
+        if ((email == null && phoneNumber == null) || (email != null && phoneNumber != null)) {
             throw new RuntimeException("Provide either email or phone number");
         }
 
-        Admin admin;
+        Admin admin = (email != null)
+                ? adminRepository.findByEmail(email).orElseThrow(() -> new RuntimeException("Admin not found"))
+                : adminRepository.findByPhoneNumber(phoneNumber).orElseThrow(() -> new RuntimeException("Admin not found"));
 
-        if (email != null) {
-            admin = adminRepository.findByEmail(email)
-                    .orElseThrow(() -> new RuntimeException("Admin not found"));
-        } else {
-            admin = adminRepository.findByPhoneNumber(phoneNumber)
-                    .orElseThrow(() -> new RuntimeException("Admin not found"));
-        }
-
-        // ===== VERIFY OTP (ALWAYS BY PHONE NUMBER) =====
         OtpStore store = otpRepository
                 .findTopByPhoneNumberOrderByCreatedAtDesc(admin.getPhoneNumber())
                 .orElseThrow(() -> new RuntimeException("OTP not sent"));
 
-        if (store.isVerified()) {
-            throw new RuntimeException("OTP already used");
+        if (store.isVerified() || store.getExpiryTime().isBefore(LocalDateTime.now()) || !store.getOtp().equals(otp)) {
+            throw new RuntimeException("Invalid or expired OTP");
         }
 
-        if (store.getExpiryTime().isBefore(LocalDateTime.now())) {
-            throw new RuntimeException("OTP expired");
-        }
-
-        if (!store.getOtp().equals(otp)) {
-            throw new RuntimeException("Invalid OTP");
-        }
-
-        // mark OTP as used
         store.setVerified(true);
         otpRepository.save(store);
 
-        // ===== RESET PASSWORD =====
         admin.setPassword(passwordEncoder.encode(newPassword));
         admin.setLastLogin(LocalDateTime.now());
         adminRepository.save(admin);
 
-        // ===== INVALIDATE ALL SESSIONS =====
         refreshTokenRepository.deleteByAdminId(admin.getId());
     }
-
 }

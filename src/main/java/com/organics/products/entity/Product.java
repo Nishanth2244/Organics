@@ -1,4 +1,3 @@
-
 package com.organics.products.entity;
 
 import java.util.List;

@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/admin/inventory")
+@RequestMapping("/api/admin")
 public class InventoryController {
 
     private final InventoryService inventoryService;
@@ -19,16 +19,14 @@ public class InventoryController {
         this.inventoryService = inventoryService;
     }
 
-    // 1️⃣ CREATE INVENTORY
-    @PostMapping
+    @PostMapping("/inventory")
     public ResponseEntity<InventoryResponse> createInventory(
             @RequestBody InventoryCreateRequest request
     ) {
         return ResponseEntity.ok(inventoryService.createInventory(request));
     }
 
-    // 2️⃣ ADD STOCK
-    @PostMapping("/{inventoryId}/add-stock")
+    @PostMapping("/inventory/{inventoryId}/add-stock")
     public ResponseEntity<Void> addStock(
             @PathVariable Long inventoryId,
             @RequestParam Integer quantity
@@ -37,8 +35,7 @@ public class InventoryController {
         return ResponseEntity.noContent().build();
     }
 
-    // 3️⃣ GET INVENTORY BY BRANCH
-    @GetMapping("/branch/{branchId}")
+    @GetMapping("/inventory/branch/{branchId}")
     public ResponseEntity<List<InventoryResponse>> getInventoryByBranch(
             @PathVariable Long branchId
     ) {
@@ -47,8 +44,7 @@ public class InventoryController {
         );
     }
 
-    // 4️⃣ GET INVENTORY BY PRODUCT
-    @GetMapping("/product/{productId}")
+    @GetMapping("/inventory/product/{productId}")
     public ResponseEntity<List<InventoryResponse>> getInventoryByProduct(
             @PathVariable Long productId
     ) {
@@ -57,8 +53,7 @@ public class InventoryController {
         );
     }
 
-    // 5️⃣ RESERVE STOCK (Order placed / cart)
-    @PostMapping("/{inventoryId}/reserve")
+    @PostMapping("/inventory/{inventoryId}/reserve")
     public ResponseEntity<Void> reserveStock(
             @PathVariable Long inventoryId,
             @RequestParam Integer quantity,
@@ -68,8 +63,7 @@ public class InventoryController {
         return ResponseEntity.noContent().build();
     }
 
-    // 6️⃣ CONFIRM STOCK (Payment success)
-    @PostMapping("/{inventoryId}/confirm")
+    @PostMapping("/inventory/{inventoryId}/confirm")
     public ResponseEntity<Void> confirmStock(
             @PathVariable Long inventoryId,
             @RequestParam Integer quantity,
@@ -79,8 +73,8 @@ public class InventoryController {
         return ResponseEntity.noContent().build();
     }
 
-    // 7️⃣ RELEASE STOCK (Cancel / payment failed)
-    @PostMapping("/{inventoryId}/release")
+    // RELEASE STOCK (Cancel / payment failed)
+    @PostMapping("/inventory/{inventoryId}/release")
     public ResponseEntity<Void> releaseStock(
             @PathVariable Long inventoryId,
             @RequestParam Integer quantity,
@@ -90,8 +84,8 @@ public class InventoryController {
         return ResponseEntity.noContent().build();
     }
 
-    // 8️⃣ INVENTORY TRANSACTIONS (Audit)
-    @GetMapping("/{inventoryId}/transactions")
+    // INVENTORY TRANSACTIONS (Audit)
+    @GetMapping("/inventory/{inventoryId}/transactions")
     public ResponseEntity<List<InventoryTransactions>> getInventoryTransactions(
             @PathVariable Long inventoryId
     ) {
@@ -99,4 +93,10 @@ public class InventoryController {
                 inventoryService.getInventoryTransactions(inventoryId)
         );
     }
+
+    @GetMapping("/inventory")
+    public ResponseEntity<List<InventoryResponse>> getAllInventory() {
+        return ResponseEntity.ok(inventoryService.getAllInventory());
+    }
+
 }
