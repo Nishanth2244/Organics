@@ -139,7 +139,7 @@ public class DiscountService {
 
         double finalPrice = price;
 
-        if (discount.getDiscountType() == DiscountType.PERCENTAGE) {
+        if (discount.getDiscountType() == DiscountType.PERCENT) {
             finalPrice -= (price * discount.getDiscountValue() / 100);
         } else {
             finalPrice -= discount.getDiscountValue();
