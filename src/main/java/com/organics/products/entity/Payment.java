@@ -19,27 +19,27 @@ import lombok.Data;
 @Table(name = "payments")
 public class Payment {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+	@Id
+	@GeneratedValue(strategy = GenerationType.IDENTITY)
+	private Long id;
 
-    // Razorpay Details
-    private String razorpayOrderId; // Razorpay nundi vachedi
-    private String razorpayPaymentId; // Success ayyaka vachedi
-    private String razorpaySignature; // Verification kosam
+	// Razorpay Details
+	private String razorpayOrderId;
+	private String razorpayPaymentId;
+	private String razorpaySignature;
 
-    @Enumerated(EnumType.STRING)
-    private PaymentStatus paymentStatus; // PENDING, SUCCESSFUL, FAILED
+	@Enumerated(EnumType.STRING)
+	private PaymentStatus paymentStatus;
 
-    private Double amount;
-    private String method; // UPI, Card, etc.
-    private LocalDate paymentDate;
+	private Double amount;
+	private String method;
+	private LocalDate paymentDate;
 
-    @OneToOne
-    @JoinColumn(name = "order_id")
-    private Order order;
+	@OneToOne
+	@JoinColumn(name = "order_id")
+	private Order order;
 
-    @ManyToOne
-    @JoinColumn(name = "user_id")
-    private User user;
+	@ManyToOne
+	@JoinColumn(name = "user_id")
+	private User user;
 }
