@@ -127,7 +127,6 @@ public class DiscountService {
         return mrp;
     }
 
-    // ================= APPLY DISCOUNT CORE =================
 
     private double applyDiscount(Discount discount, double price) {
 
@@ -139,7 +138,7 @@ public class DiscountService {
 
         double finalPrice = price;
 
-        if (discount.getDiscountType() == DiscountType.PERCENTAGE) {
+        if (discount.getDiscountType() == DiscountType.PERCENT) {
             finalPrice -= (price * discount.getDiscountValue() / 100);
         } else {
             finalPrice -= discount.getDiscountValue();
@@ -148,7 +147,6 @@ public class DiscountService {
         return Math.max(finalPrice, 0);
     }
 
-    // ================= CART DISCOUNT (OPTIONAL) =================
 
     public double applyCartDiscount(Long cartId, double cartTotal) {
 
