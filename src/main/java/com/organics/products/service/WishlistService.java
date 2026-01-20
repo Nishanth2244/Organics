@@ -18,22 +18,23 @@ public class WishlistService {
     private final ProductRepo productRepository;
     private final InventoryRepository inventoryRepository;
     private final S3Service s3Service;
+    private final DiscountService discountService;
 
     public WishlistService(
             WishlistRepository wishlistRepository,
             WishListItemsRepository wishListItemsRepository,
             ProductRepo productRepository,
             InventoryRepository inventoryRepository,
-            S3Service s3Service
+            S3Service s3Service, DiscountService discountService
     ) {
         this.wishlistRepository = wishlistRepository;
         this.wishListItemsRepository = wishListItemsRepository;
         this.productRepository = productRepository;
         this.inventoryRepository = inventoryRepository;
         this.s3Service = s3Service;
+        this.discountService = discountService;
     }
 
-    // ➕ Add product to wishlist (FIXED for Set)
     public ProductDTO addToWishlist(Long productId) {
 
         Long userId = SecurityUtil.getCurrentUserId()
@@ -67,7 +68,6 @@ public class WishlistService {
         return mapToProductDTO(product);
     }
 
-    // 📄 Get all wishlist products (Hibernate-safe)
     public List<ProductDTO> getMyWishlist() {
 
         Long userId = SecurityUtil.getCurrentUserId()
@@ -99,7 +99,6 @@ public class WishlistService {
                 wishlist.getId(), productId
         );
     }
-
     private ProductDTO mapToProductDTO(Product product) {
 
         ProductDTO r = new ProductDTO();
@@ -109,7 +108,6 @@ public class WishlistService {
         r.setBrand(product.getBrand());
         r.setDescription(product.getDescription());
         r.setReturnDays(product.getReturnDays());
-
         r.setMrp(product.getMRP());
         r.setStatus(product.getStatus());
         r.setNetWeight(product.getNetWeight());
@@ -121,12 +119,17 @@ public class WishlistService {
 
         List<Inventory> inventories = inventoryRepository.findByProductId(product.getId());
         if (inventories != null && !inventories.isEmpty()) {
+
+            Inventory inv = inventories.get(0);
+            r.setInventoryId(inv.getId());
+
             int totalStock = inventories.stream()
-                    .mapToInt(inv -> inv.getAvailableStock() != null ? inv.getAvailableStock() : 0)
+                    .mapToInt(i -> i.getAvailableStock() != null ? i.getAvailableStock() : 0)
                     .sum();
             r.setAvailableStock(totalStock);
         } else {
             r.setAvailableStock(0);
+            r.setInventoryId(null);
         }
 
         if (product.getImages() != null) {
@@ -138,7 +141,23 @@ public class WishlistService {
             );
         }
 
+        Double finalPrice = discountService.calculateFinalPrice(product);
+        r.setFinalPrice(finalPrice);
+
+        if (finalPrice < product.getMRP()) {
+            r.setDiscountAmount(product.getMRP() - finalPrice);
+
+            Discount discount = discountService.getApplicableDiscount(product);
+            if (discount != null) {
+                r.setDiscountType(discount.getDiscountType());
+            }
+        } else {
+            r.setDiscountAmount(null);
+            r.setDiscountType(null);
+        }
+
         return r;
     }
+
 
 }

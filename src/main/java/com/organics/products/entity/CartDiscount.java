@@ -15,7 +15,8 @@ public class CartDiscount {
 
     private Long cartId;
 
-    @ManyToOne
-    @JoinColumn(name = "discount_id")
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "discount_id", nullable = false)
     private Discount discount;
+
 }

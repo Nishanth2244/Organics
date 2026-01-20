@@ -127,7 +127,6 @@ public class DiscountService {
         return mrp;
     }
 
-    // ================= APPLY DISCOUNT CORE =================
 
     private double applyDiscount(Discount discount, double price) {
 
@@ -148,7 +147,6 @@ public class DiscountService {
         return Math.max(finalPrice, 0);
     }
 
-    // ================= CART DISCOUNT (OPTIONAL) =================
 
     public double applyCartDiscount(Long cartId, double cartTotal) {
 

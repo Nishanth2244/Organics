@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+import com.organics.products.entity.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -13,14 +14,6 @@ import com.organics.products.config.SecurityUtil;
 import com.organics.products.dto.AddToCartRequest;
 import com.organics.products.dto.CartDTO;
 import com.organics.products.dto.CartItemDTO;
-import com.organics.products.entity.Cart;
-import com.organics.products.entity.CartCoupon;
-import com.organics.products.entity.CartItems;
-import com.organics.products.entity.Coupon;
-import com.organics.products.entity.DiscountType;
-import com.organics.products.entity.Inventory;
-import com.organics.products.entity.Product;
-import com.organics.products.entity.User;
 import com.organics.products.exception.ResourceNotFoundException;
 import com.organics.products.respository.CartItemRepository;
 import com.organics.products.respository.CartRepository;
@@ -55,6 +48,10 @@ public class CartService {
 
 	@Autowired
 	private CouponRepository couponRepository;
+
+	@Autowired
+	private DiscountService discountService;
+
 
 	private CartDTO convertToCartDTO(Cart cart) {
 		CartDTO dto = new CartDTO();
@@ -92,6 +89,20 @@ public class CartService {
 
 			if (product.getImages() != null && !product.getImages().isEmpty()) {
 				itemDTO.setImageUrl(s3Service.getFileUrl(product.getImages().get(0).getImageUrl()));
+			}
+			Double finalPrice = discountService.calculateFinalPrice(product);
+			itemDTO.setFinalPrice(finalPrice);
+
+			if (finalPrice < mrp) {
+				itemDTO.setDiscountAmount(mrp - finalPrice);
+
+				Discount discount = discountService.getApplicableDiscount(product);
+				if (discount != null) {
+					itemDTO.setDiscountType(discount.getDiscountType());
+				}
+			} else {
+				itemDTO.setDiscountAmount(null);
+				itemDTO.setDiscountType(null);
 			}
 
 			itemDTOs.add(itemDTO);
@@ -172,18 +183,24 @@ public class CartService {
 
 		double totalMrp = 0.0;
 		double totalPayable = 0.0;
+		double totalDiscount = 0.0;
 
 		for (CartItems item : cart.getItems()) {
+
 			Product product = item.getInventory().getProduct();
 			int qty = item.getQuantity();
 
 			double mrp = product.getMRP() != null ? product.getMRP() : 0.0;
+			double finalPrice = discountService.calculateFinalPrice(product);
 
 			totalMrp += (mrp * qty);
+			totalPayable += (finalPrice * qty);
+			totalDiscount += ((mrp - finalPrice) * qty);
 		}
 
 		cart.setTotalAmount(totalMrp);
 		cart.setPayableAmount(totalPayable);
+		cart.setDiscountAmount(totalDiscount);
 
 		Cart savedCart = cartRepository.save(cart);
 		return convertToCartDTO(savedCart);
@@ -239,7 +256,9 @@ public class CartService {
 	            .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
 	    Cart cart = getOrCreateActiveCart(user);
-
+		if (cart.getItems().isEmpty()) {
+			throw new RuntimeException("Cart is empty");
+		}
 	    Coupon coupon = couponRepository.findById(couponId)
 	            .orElseThrow(() -> new ResourceNotFoundException("Coupon not found"));
 
@@ -247,24 +266,25 @@ public class CartService {
 	    if (coupon.getEndDate() != null && coupon.getEndDate().isBefore(LocalDate.now())) 
 	        throw new RuntimeException("Coupon expired");
 
-	    double totalAmount = cart.getTotalAmount();
-	    if (coupon.getMinOrderAmount() != null && totalAmount < coupon.getMinOrderAmount())
-	        throw new RuntimeException("Minimum amount required: " + coupon.getMinOrderAmount());
+		double totalAmount = cart.getPayableAmount();
+		if (coupon.getMinOrderAmount() != null && totalAmount < coupon.getMinOrderAmount())
+			throw new RuntimeException("Minimum amount required: " + coupon.getMinOrderAmount());
 
-	    double discount = 0.0;
-	    if (coupon.getDiscountType() == DiscountType.PERCENT) {
-	        discount = (totalAmount * coupon.getDiscountValue()) / 100;
-	        if (coupon.getMaxDiscountAmount() != null && discount > coupon.getMaxDiscountAmount()) {
-	            discount = coupon.getMaxDiscountAmount();
-	        }
-	    } else {
-	        discount = coupon.getDiscountValue();
-	    }
+		double discount = 0.0;
+		if (coupon.getDiscountType() == DiscountType.PERCENT) {
+			discount = (totalAmount * coupon.getDiscountValue()) / 100;
+			if (coupon.getMaxDiscountAmount() != null && discount > coupon.getMaxDiscountAmount()) {
+				discount = coupon.getMaxDiscountAmount();
+			}
+		} else {
+			discount = coupon.getDiscountValue();
+		}
 
-	    cart.setDiscountAmount(discount);
-	    cart.setPayableAmount(totalAmount - discount);
+		cart.setDiscountAmount(cart.getDiscountAmount() + discount);
+		cart.setPayableAmount(totalAmount - discount);
 
-	    CartCoupon cartCoupon = new CartCoupon();
+
+		CartCoupon cartCoupon = new CartCoupon();
 	    cartCoupon.setCart(cart);
 	    cartCoupon.setCoupon(coupon);
 	    cart.getAppliedCoupons().add(cartCoupon); 
