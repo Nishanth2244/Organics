@@ -1,9 +1,18 @@
 package com.organics.products.entity;
 
-import jakarta.persistence.*;
-import lombok.Data;
-
 import java.time.LocalDate;
+
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToOne;
+import jakarta.persistence.Table;
+import lombok.Data;
 
 @Entity
 @Data
@@ -14,11 +23,16 @@ public class Payment {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    // Razorpay Details
+    private String razorpayOrderId; // Razorpay nundi vachedi
+    private String razorpayPaymentId; // Success ayyaka vachedi
+    private String razorpaySignature; // Verification kosam
+
     @Enumerated(EnumType.STRING)
-    private PaymentStatus paymentStatus;
+    private PaymentStatus paymentStatus; // PENDING, SUCCESSFUL, FAILED
 
     private Double amount;
-    private String method;
+    private String method; // UPI, Card, etc.
     private LocalDate paymentDate;
 
     @OneToOne
@@ -28,5 +42,4 @@ public class Payment {
     @ManyToOne
     @JoinColumn(name = "user_id")
     private User user;
-
 }

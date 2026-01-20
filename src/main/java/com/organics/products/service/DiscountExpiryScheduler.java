@@ -20,7 +20,6 @@ public class DiscountExpiryScheduler {
         this.discountRepository = discountRepository;
     }
 
-    // Runs every 1 minutes
     @Scheduled(fixedRate = 60000)
     @Transactional
     public void expireDiscounts() {

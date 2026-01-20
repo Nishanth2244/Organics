@@ -24,7 +24,6 @@ public class Address {
     @Column(nullable = false)
     private AddressType addressType; // HOME, WORK
 
-    @Pattern(regexp = "^[6-9]\\d{9}$")
     @Column(name = "alternate_phone", length = 15)
     private String alternatePhoneNumber;
 
