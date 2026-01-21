@@ -156,6 +156,13 @@ public class CartService {
 		if (inventory.getAvailableStock() < request.getQuantity()) {
 			throw new RuntimeException("Insufficient stock");
 		}
+
+		// Get the product from inventory
+		Product product = inventory.getProduct();
+		if (product == null) {
+			throw new RuntimeException("Product not found for inventory ID: " + request.getInventoryId());
+		}
+
 		Optional<CartItems> existingItem = cart.getItems().stream()
 				.filter(item -> item.getInventory().getId().equals(request.getInventoryId())).findFirst();
 
@@ -181,17 +188,18 @@ public class CartService {
 
 		}
 
+		// Rest of your code remains the same...
 		double totalMrp = 0.0;
 		double totalPayable = 0.0;
 		double totalDiscount = 0.0;
 
 		for (CartItems item : cart.getItems()) {
 
-			Product product = item.getInventory().getProduct();
+			Product cartItemProduct = item.getInventory().getProduct(); // Get product from cart item
 			int qty = item.getQuantity();
 
-			double mrp = product.getMRP() != null ? product.getMRP() : 0.0;
-			double finalPrice = discountService.calculateFinalPrice(product);
+			double mrp = cartItemProduct.getMRP() != null ? cartItemProduct.getMRP() : 0.0;
+			double finalPrice = discountService.calculateFinalPrice(cartItemProduct);
 
 			totalMrp += (mrp * qty);
 			totalPayable += (finalPrice * qty);
@@ -220,30 +228,50 @@ public class CartService {
 	}
 
 	public CartDTO decreaseQuantity(Long inventoryId) {
+	    Long customerId = SecurityUtil.getCurrentUserId()
+	            .orElseThrow(() -> new ResourceNotFoundException("User Not authenticated"));
 
-		Long customerId = SecurityUtil.getCurrentUserId()
-				.orElseThrow(() -> new ResourceNotFoundException("User Not authenticated to decrease cart: "));
+	    User user = customerRepository.findById(customerId)
+	            .orElseThrow(() -> new ResourceNotFoundException("User Not Found"));
 
-		User user = customerRepository.findById(customerId)
-				.orElseThrow(() -> new ResourceNotFoundException("User Not Found to decrease cart"));
+	    Cart cart = cartRepository.findByUserAndIsActive(user, true).stream().findFirst()
+	            .orElseThrow(() -> new ResourceNotFoundException("Active cart not found"));
 
-		Cart cart = cartRepository.findByUserAndIsActive(user, true).stream().findFirst()
-				.orElseThrow(() -> new ResourceNotFoundException("Active cart not found"));
+	    CartItems existingItem = cart.getItems().stream()
+	            .filter(item -> item.getInventory().getId().equals(inventoryId)).findFirst()
+	            .orElseThrow(() -> new ResourceNotFoundException("Product not found in cart"));
 
-		CartItems existingItem = cart.getItems().stream()
-				.filter(item -> item.getInventory().getId().equals(inventoryId)).findFirst()
-				.orElseThrow(() -> new ResourceNotFoundException("Product not found in cart"));
+	    if (existingItem.getQuantity() > 1) {
+	        existingItem.setQuantity(existingItem.getQuantity() - 1);
+	        cartItemRepository.save(existingItem);
+	    } else {
+	        cart.getItems().remove(existingItem);
+	        cartItemRepository.delete(existingItem);
+	    }
 
-		if (existingItem.getQuantity() > 1) {
-			existingItem.setQuantity(existingItem.getQuantity() - 1);
-			cartItemRepository.save(existingItem);
-		} else {
-			cart.getItems().remove(existingItem);
-			cartItemRepository.delete(existingItem);
-		}
+	    double totalMrp = 0.0;
+	    double totalPayable = 0.0;
+	    double totalDiscount = 0.0;
 
-		Cart updatedCart = cartRepository.save(cart);
-		return convertToCartDTO(updatedCart);
+	    for (CartItems item : cart.getItems()) {
+	        Product product = item.getInventory().getProduct();
+	        int qty = item.getQuantity();
+
+	        double mrp = product.getMRP() != null ? product.getMRP() : 0.0;
+	        double finalPrice = discountService.calculateFinalPrice(product); 
+
+	        totalMrp += (mrp * qty);
+	        totalPayable += (finalPrice * qty);
+	        totalDiscount += ((mrp - finalPrice) * qty);
+	    }
+
+	    
+	    cart.setTotalAmount(totalMrp);
+	    cart.setPayableAmount(totalPayable);
+	    cart.setDiscountAmount(totalDiscount);
+
+	    Cart updatedCart = cartRepository.save(cart);
+	    return convertToCartDTO(updatedCart);
 	}
 	
 	
@@ -256,13 +284,25 @@ public class CartService {
 	            .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
 	    Cart cart = getOrCreateActiveCart(user);
+	    
 		if (cart.getItems().isEmpty()) {
 			throw new RuntimeException("Cart is empty");
 		}
+		
+		boolean alreadyApplied = cart.getAppliedCoupons().stream()
+	            .anyMatch(c -> c.getCoupon().getId().equals(couponId));
+	    
+	    if (alreadyApplied) {
+	        throw new RuntimeException("Coupon already applied to this cart");
+	    }
+		
 	    Coupon coupon = couponRepository.findById(couponId)
 	            .orElseThrow(() -> new ResourceNotFoundException("Coupon not found"));
 
-	    if (!coupon.isActive()) throw new RuntimeException("Coupon is inactive");
+	    if (!coupon.isActive()) {
+	    	throw new RuntimeException("Coupon is inactive");
+	    }
+	    
 	    if (coupon.getEndDate() != null && coupon.getEndDate().isBefore(LocalDate.now())) 
 	        throw new RuntimeException("Coupon expired");
 
@@ -288,6 +328,51 @@ public class CartService {
 	    cartCoupon.setCart(cart);
 	    cartCoupon.setCoupon(coupon);
 	    cart.getAppliedCoupons().add(cartCoupon); 
+
+	    cartRepository.save(cart);
+	    return convertToCartDTO(cart);
+	}
+	
+	
+	public CartDTO removeCoupon(Long couponId) {
+	    Long userId = SecurityUtil.getCurrentUserId()
+	            .orElseThrow(() -> new RuntimeException("Unauthorized"));
+
+	    User user = customerRepository.findById(userId)
+	            .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+	    Cart cart = getOrCreateActiveCart(user);
+
+	    CartCoupon appliedCoupon = cart.getAppliedCoupons().stream()
+	            .filter(c -> c.getCoupon().getId().equals(couponId))
+	            .findFirst()
+	            .orElseThrow(() -> new RuntimeException("Coupon not found in this cart"));
+
+	    double discountValue = 0.0;
+	    Coupon coupon = appliedCoupon.getCoupon();
+	    
+	    
+	    cart.getAppliedCoupons().remove(appliedCoupon);
+
+	    double totalMrp = 0.0;
+	    double totalPayable = 0.0;
+	    double totalDiscount = 0.0;
+
+	    for (CartItems item : cart.getItems()) {
+	        Product product = item.getInventory().getProduct();
+	        int qty = item.getQuantity();
+
+	        double mrp = product.getMRP() != null ? product.getMRP() : 0.0;
+	        double finalPrice = discountService.calculateFinalPrice(product);
+
+	        totalMrp += (mrp * qty);
+	        totalPayable += (finalPrice * qty);
+	        totalDiscount += ((mrp - finalPrice) * qty);
+	    }
+
+	    cart.setTotalAmount(totalMrp);
+	    cart.setDiscountAmount(totalDiscount);
+	    cart.setPayableAmount(totalPayable);
 
 	    cartRepository.save(cart);
 	    return convertToCartDTO(cart);

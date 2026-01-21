@@ -1,3 +1,4 @@
+// OrderItemDTO.java
 package com.organics.products.dto;
 
 import lombok.Data;
@@ -8,4 +9,7 @@ public class OrderItemDTO {
     private String productName;
     private Integer quantity;
     private Double price;
+    private Double tax;
+    private Double discount;
+    private Double totalPrice;
 }

@@ -1,6 +1,7 @@
 package com.organics.products.controller;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -57,6 +58,12 @@ public class CartController {
 	public CartDTO applyCoupon(@RequestParam Long couponId) {
 	    log.info("Applying coupon ID: {} to cart", couponId);
 	    return cartService.applyCoupon(couponId);
+	}
+	
+	@DeleteMapping("/removeCoupon/{couponId}")
+	public CartDTO removeCoupon(@PathVariable Long couponId) {
+	    log.info("Removing coupon ID: {} from cart", couponId);
+	    return cartService.removeCoupon(couponId);
 	}
 
 }

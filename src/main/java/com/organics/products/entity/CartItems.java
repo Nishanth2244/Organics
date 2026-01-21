@@ -21,4 +21,5 @@ public class CartItems {
     @ManyToOne
     @JoinColumn(name = "inventory_id")
     private Inventory inventory;
+
 }

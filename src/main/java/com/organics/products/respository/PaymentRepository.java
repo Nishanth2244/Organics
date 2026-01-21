@@ -8,4 +8,6 @@ import com.organics.products.entity.Payment;
 @Repository
 public interface PaymentRepository extends JpaRepository<Payment, Long> {
 
+	Payment findByRazorpayOrderId(String razorpayOrderId);
+
 }
