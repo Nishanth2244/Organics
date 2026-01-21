@@ -11,6 +11,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+import com.organics.products.entity.*;
+import com.organics.products.respository.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,24 +25,7 @@ import com.organics.products.dto.OrderItemDTO;
 import com.organics.products.dto.ShippingAddressDTO;
 import com.organics.products.dto.ShiprocketCreateOrderResponse;
 import com.organics.products.dto.ShiprocketTrackingResponse;
-import com.organics.products.entity.Address;
-import com.organics.products.entity.Cart;
-import com.organics.products.entity.CartItems;
-import com.organics.products.entity.Inventory;
-import com.organics.products.entity.Order;
-import com.organics.products.entity.OrderItems;
-import com.organics.products.entity.OrderStatus;
-import com.organics.products.entity.PaymentStatus;
-import com.organics.products.entity.User;
 import com.organics.products.exception.ResourceNotFoundException;
-import com.organics.products.respository.AddressRepository;
-import com.organics.products.respository.CartItemRepository;
-import com.organics.products.respository.CartRepository;
-import com.organics.products.respository.OrderItemsRepository;
-import com.organics.products.respository.OrderRepository;
-import com.organics.products.respository.PaymentRepository;
-import com.organics.products.respository.ProductRepo;
-import com.organics.products.respository.UserRepository;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -77,6 +62,12 @@ public class OrderService {
 
     @Autowired
     private PaymentRepository paymentRepository;
+
+    @Autowired
+    private InventoryService inventoryService;
+
+    @Autowired
+    private InventoryRepository inventoryRepository;
 
     //@Autowired
     //private WarehouseRepository warehouseRepository;
@@ -117,7 +108,39 @@ public class OrderService {
             throw new RuntimeException("Cart is empty. Cannot place order.");
         }
 
-        // Create order FIRST
+        // **1. CHECK STOCK AVAILABILITY AND RESERVE STOCK**
+        List<Inventory> inventoriesToReserve = new ArrayList<>();
+        Map<Long, Integer> productQuantities = new HashMap<>();
+
+        for (CartItems cartItem : cartItems) {
+            // Get product from cart item
+            Product product = cartItem.getInventory().getProduct();
+
+            // Find inventory for this product (assuming single branch for now)
+            // If you have multiple branches, you need logic to pick the right branch
+            List<Inventory> inventories = inventoryRepository.findByProductId(product.getId());
+
+            if (inventories.isEmpty()) {
+                throw new RuntimeException("No inventory found for product: " + product.getProductName());
+            }
+
+            // For simplicity, use first inventory (you might need logic for branch selection)
+            Inventory inventory = inventories.get(0);
+
+            // Check if enough stock is available
+            if (inventory.getAvailableStock() < cartItem.getQuantity()) {
+                throw new RuntimeException("Insufficient stock for product: " +
+                        product.getProductName() +
+                        ". Available: " + inventory.getAvailableStock() +
+                        ", Requested: " + cartItem.getQuantity());
+            }
+
+            // Store for reservation
+            inventoriesToReserve.add(inventory);
+            productQuantities.put(inventory.getId(), cartItem.getQuantity());
+        }
+
+        // Create order
         Order order = new Order();
         order.setOrderDate(LocalDate.now());
         order.setOrderAmount(0.0);
@@ -137,19 +160,15 @@ public class OrderService {
         double totalDiscount = 0.0;
 
         for (CartItems cartItem : cartItems) {
-            Inventory inventory = cartItem.getInventory();
-
-            if (inventory == null) {
-                throw new RuntimeException("Product not found for cart item: " + cartItem.getId());
-            }
+            Product product = cartItem.getInventory().getProduct();
 
             OrderItems orderItem = new OrderItems();
             orderItem.setOrder(savedOrder);
-            orderItem.setProduct(inventory.getProduct());
+            orderItem.setProduct(product);
             orderItem.setQuantity(cartItem.getQuantity());
 
             // Get actual product prices
-            Double mrp = inventory.getProduct().getMRP();
+            Double mrp = product.getMRP();
             Double sellingPrice = cartItem.getCart().getPayableAmount();
 
             // If afterDiscount is not set or 0, use MRP
@@ -162,7 +181,7 @@ public class OrderService {
                     (mrp != null ? mrp : 0.0);
 
             if (price <= 0) {
-                throw new RuntimeException("Invalid price for product: " + inventory.getProduct().getProductName());
+                throw new RuntimeException("Invalid price for product: " + product.getProductName());
             }
 
             orderItem.setPrice(price);
@@ -201,7 +220,6 @@ public class OrderService {
         }
 
         // Calculate final payable amount
-        // Grand Total = (Total Amount + Total Tax) - Total Discount
         double grandTotal = totalAmount;
 
         // Verify with cart's payable amount (optional validation)
@@ -209,20 +227,40 @@ public class OrderService {
         if (cartPayableAmount != null && Math.abs(cartPayableAmount - grandTotal) > 1.0) {
             log.warn("Cart payable amount (${}) differs from calculated amount (${})",
                     cartPayableAmount, grandTotal);
-            // You might want to use cartPayableAmount instead if it's more accurate
-            // grandTotal = cartPayableAmount;
         }
 
         // Update order amount with grand total
         savedOrder.setOrderAmount(grandTotal);
 
+        // **2. RESERVE STOCK FOR ORDER (PENDING STATE)**
+        for (Inventory inventory : inventoriesToReserve) {
+            Integer quantity = productQuantities.get(inventory.getId());
+            try {
+                inventoryService.reserveStock(inventory.getId(), quantity, savedOrder.getId());
+                log.info("Stock reserved for product {}: {} units. Available: {}, Reserved: {}",
+                        inventory.getProduct().getProductName(), quantity,
+                        inventory.getAvailableStock() - quantity,
+                        inventory.getReservedStock() + quantity);
+            } catch (Exception e) {
+                // If reservation fails, roll back the order
+                orderRepository.delete(savedOrder);
+                throw new RuntimeException("Failed to reserve stock for product: " +
+                        inventory.getProduct().getProductName() + ". " + e.getMessage());
+            }
+        }
+
         // Save all order items
         orderItemsRepository.saveAll(orderItemsList);
         savedOrder.setOrderItems(orderItemsList);
 
-
+        // **DO NOT clear cart here - wait for payment success**
         log.info("Order placed successfully. Order ID: {}, Amount: {}, Tax: {}, Discount: {}",
                 savedOrder.getId(), grandTotal, totalTax, totalDiscount);
+
+        // Mark order as PENDING (waiting for payment)
+        savedOrder.setOrderStatus(OrderStatus.PENDING);
+        orderRepository.save(savedOrder);
+
 
 
 
@@ -254,7 +292,7 @@ public class OrderService {
         } catch (Exception e) {
             log.error("Failed to create Shiprocket order: {}", e.getMessage());
 
-            // Store only first 200 chars of error
+
             String errorMessage = e.getMessage();
             if (errorMessage != null && errorMessage.length() > 200) {
                 errorMessage = errorMessage.substring(0, 200);

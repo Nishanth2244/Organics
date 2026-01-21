@@ -103,7 +103,7 @@ public class InventoryService {
 
         inventoryRepository.save(inventory);
 
-        saveTransaction(inventory, InventoryTransactionType.RESERVE,
+        saveTransaction(inventory, InventoryTransactionType.SOLD,
                 quantity, InventoryReferenceType.ORDER, orderId);
     }
 
