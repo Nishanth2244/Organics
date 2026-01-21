@@ -38,15 +38,6 @@ public class PaymentService {
 	@Autowired
 	private PaymentRepository paymentRepository;
 
-<<<<<<< HEAD
-	public OrderResponse createOrder(Long cartId) throws RazorpayException {
-
-		Cart cart = cartRepository.findById(cartId)
-				.orElseThrow(() -> new ResourceNotFoundException("Cart not found: " + cartId));
-
-		Double amount = cart.getPayableAmount();
-		
-=======
 	@Autowired
 	private OrderRepository orderRepository;
 
@@ -67,7 +58,6 @@ public class PaymentService {
 
 		Double amount = ExistingOrder.getOrderAmount();
 
->>>>>>> nishanth
 		JSONObject orderRequest = new JSONObject();
 		orderRequest.put("amount", amount * 100);
 		orderRequest.put("currency", "INR");
@@ -95,47 +85,47 @@ public class PaymentService {
 
 	@Transactional
 	public boolean verifyPayment(String razorpayOrderId, String razorpayPaymentId, String razorpaySignature) {
-		
+
 		try {
 			JSONObject verifyRequest = new JSONObject();
 			verifyRequest.put("razorpay_order_id", razorpayOrderId);
 			verifyRequest.put("razorpay_payment_id", razorpayPaymentId);
 			verifyRequest.put("razorpay_signature", razorpaySignature);
-			
+
 			boolean isValid = Utils.verifyPaymentSignature(verifyRequest, secretKey);
-			
+
 			if (isValid) {
-	            Payment payment = paymentRepository.findByRazorpayOrderId(razorpayOrderId);
-	            
-	            if(payment == null) {
-	            	throw new ResourceNotFoundException("Payment record not found");
-	            }
-	            
-	            com.razorpay.Payment razorpayPayment = razorpayClient.payments.fetch(razorpayPaymentId);
-	            String method = razorpayPayment.get("method");
-	            
-	            payment.setRazorpayPaymentId(razorpayPaymentId);
-	            payment.setRazorpaySignature(razorpaySignature);
-	            payment.setMethod(method);
-	            payment.setPaymentStatus(PaymentStatus.SUCCESSFUL);
-	            payment.setPaymentDate(LocalDate.now());
-	            paymentRepository.save(payment);
-	            
-	            com.organics.products.entity.Order order = new com.organics.products.entity.Order();
-	            order.setOrderStatus(OrderStatus.CONFIRMED);
-	            orderRepository.save(order);
-	            
-	            log.info("Payment verified and Order confirmed for Order ID: {}", order.getId());
-	            return true;
+				Payment payment = paymentRepository.findByRazorpayOrderId(razorpayOrderId);
+
+				if(payment == null) {
+					throw new ResourceNotFoundException("Payment record not found");
+				}
+
+				com.razorpay.Payment razorpayPayment = razorpayClient.payments.fetch(razorpayPaymentId);
+				String method = razorpayPayment.get("method");
+
+				payment.setRazorpayPaymentId(razorpayPaymentId);
+				payment.setRazorpaySignature(razorpaySignature);
+				payment.setMethod(method);
+				payment.setPaymentStatus(PaymentStatus.SUCCESSFUL);
+				payment.setPaymentDate(LocalDate.now());
+				paymentRepository.save(payment);
+
+				com.organics.products.entity.Order order = payment.getOrder();
+				order.setPaymentStatus(PaymentStatus.SUCCESSFUL);
+				orderRepository.save(order);
+
+				log.info("Payment verified and Order confirmed for Order ID: {}", order.getId());
+				return true;
 			}
 
-					
+
 		}
 		catch (Exception e) {
 			log.error("Payment verification failed: {}", e.getMessage());
 		}
 		return false;
-		
+
 	}
 
 }
