@@ -33,12 +33,9 @@ public class PaymentService {
 
 	public OrderResponse createOrder(Long cartId) throws RazorpayException {
 		
-		Cart cart =  cartRepository.findById(cartId).get();
-		
-		if(cart == null) {
-			throw new ResourceNotFoundException("Cart not found to do Payment: "+ cartId);
-		}
-		
+		Cart cart =  cartRepository.findById(cartId)
+				.orElseThrow(() -> new ResourceNotFoundException("Cart Id not found"));
+
 		Double amount = cart.getPayableAmount();
 		
 		JSONObject orderRequest = new JSONObject();

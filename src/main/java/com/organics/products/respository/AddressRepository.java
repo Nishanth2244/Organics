@@ -29,4 +29,22 @@ void clearPrimary(Long userId);
     Optional<Address> findFirstByUserIdOrderByIdAsc(Long userId);
 
     boolean existsByUserIdAndIsPrimaryTrue(Long userId);
+
+
+
+    List<Address> findByUserId(Long userId);
+
+
+    Optional<Address> findById(Long id);
+
+    @Query("SELECT a FROM Address a WHERE a.user.id = :userId AND a.isPrimary = true")
+    Optional<Address> findPrimaryAddressByUserId(@Param("userId") Long userId);
+
+    @Query("SELECT a FROM Address a WHERE a.user.id = :userId ORDER BY a.isPrimary DESC, a.id ASC")
+    List<Address> findAllByUserIdOrderByPrimary(@Param("userId") Long userId);
+
+    @Query("SELECT a FROM Address a WHERE a.user.id = :userId ORDER BY a.id ASC LIMIT 1")
+    Optional<Address> findFirstByUserId(@Param("userId") Long userId);
+
+    void deleteByIdAndUserId(Long id, Long userId);
 }

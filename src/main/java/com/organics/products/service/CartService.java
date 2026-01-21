@@ -156,6 +156,13 @@ public class CartService {
 		if (inventory.getAvailableStock() < request.getQuantity()) {
 			throw new RuntimeException("Insufficient stock");
 		}
+
+		// Get the product from inventory
+		Product product = inventory.getProduct();
+		if (product == null) {
+			throw new RuntimeException("Product not found for inventory ID: " + request.getInventoryId());
+		}
+
 		Optional<CartItems> existingItem = cart.getItems().stream()
 				.filter(item -> item.getInventory().getId().equals(request.getInventoryId())).findFirst();
 
@@ -175,23 +182,25 @@ public class CartService {
 			CartItems newItem = new CartItems();
 			newItem.setCart(cart);
 			newItem.setInventory(inventory);
+			newItem.setProduct(product); // CRITICAL: Set the product
 			newItem.setQuantity(request.getQuantity());
 			cart.getItems().add(newItem);
 			cartItemRepository.save(newItem);
 
 		}
 
+		// Rest of your code remains the same...
 		double totalMrp = 0.0;
 		double totalPayable = 0.0;
 		double totalDiscount = 0.0;
 
 		for (CartItems item : cart.getItems()) {
 
-			Product product = item.getInventory().getProduct();
+			Product cartItemProduct = item.getProduct(); // Get product from cart item
 			int qty = item.getQuantity();
 
-			double mrp = product.getMRP() != null ? product.getMRP() : 0.0;
-			double finalPrice = discountService.calculateFinalPrice(product);
+			double mrp = cartItemProduct.getMRP() != null ? cartItemProduct.getMRP() : 0.0;
+			double finalPrice = discountService.calculateFinalPrice(cartItemProduct);
 
 			totalMrp += (mrp * qty);
 			totalPayable += (finalPrice * qty);

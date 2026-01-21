@@ -49,4 +49,6 @@ public class Product {
     
     @OneToMany(mappedBy = "product")
     private List<Inventory> inventories;
+
+    private String sku;
 }

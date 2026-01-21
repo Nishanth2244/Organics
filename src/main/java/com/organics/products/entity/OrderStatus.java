@@ -1,6 +1,12 @@
 package com.organics.products.entity;
 
+
 public enum OrderStatus {
+    PENDING,
     CONFIRMED,
-    REJECTED
+    PROCESSING,
+    SHIPPED,
+    DELIVERED,
+    CANCELLED,
+    REFUNDED
 }
