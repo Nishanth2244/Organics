@@ -38,6 +38,15 @@ public class PaymentService {
 	@Autowired
 	private PaymentRepository paymentRepository;
 
+<<<<<<< HEAD
+	public OrderResponse createOrder(Long cartId) throws RazorpayException {
+
+		Cart cart = cartRepository.findById(cartId)
+				.orElseThrow(() -> new ResourceNotFoundException("Cart not found: " + cartId));
+
+		Double amount = cart.getPayableAmount();
+		
+=======
 	@Autowired
 	private OrderRepository orderRepository;
 
@@ -58,6 +67,7 @@ public class PaymentService {
 
 		Double amount = ExistingOrder.getOrderAmount();
 
+>>>>>>> nishanth
 		JSONObject orderRequest = new JSONObject();
 		orderRequest.put("amount", amount * 100);
 		orderRequest.put("currency", "INR");
