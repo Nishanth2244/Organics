@@ -2,7 +2,9 @@ package com.organics.products.service;
 
 import com.organics.products.dto.BannerResponse;
 import com.organics.products.entity.Banner;
+import com.organics.products.entity.User;
 import com.organics.products.respository.BannerRepository;
+import com.organics.products.respository.UserRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -11,6 +13,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -19,13 +22,16 @@ public class BannerService {
 
     private final BannerRepository bannerRepository;
     private final S3Service s3Service;
+    private final UserRepository userRepository;
+    private final NotificationService notificationService;
 
-    public BannerService(BannerRepository bannerRepository, S3Service s3Service) {
+    public BannerService(BannerRepository bannerRepository, S3Service s3Service, UserRepository userRepository, NotificationService notificationService) {
         this.bannerRepository = bannerRepository;
         this.s3Service = s3Service;
+        this.userRepository = userRepository;
+        this.notificationService = notificationService;
     }
 
-    // ✅ CREATE BANNER
     public BannerResponse add(
             MultipartFile[] images,
             String title,
@@ -61,12 +67,27 @@ public class BannerService {
         banner.setRedirectUrl(redirectUrl);
 
         Banner saved = bannerRepository.save(banner);
+        log.info("Broadcasting new banner notification to all users...");
+        List<User> users = userRepository.findAll();
 
+        for (User user : users) {
+            notificationService.sendNotification(
+                    String.valueOf(user.getId()),    // Receiver ID
+                    "New Offer: " + saved.getTitle(),// Message
+                    "Admin",                         // Sender
+                    "PROMO",                         // Type
+                    saved.getRedirectUrl(),          // Link
+                    "MARKETING",                     // Category
+                    "INFO",                          // Kind
+                    "Check out our new updates!"     // Subject
+            );
+        }
+
+        log.info("Banner created and notifications sent. Banner ID {}", saved.getId());
         log.info("Banner created successfully with ID {}", saved.getId());
         return mapToResponse(saved);
     }
 
-    // ✅ GET ALL BANNERS
     @Transactional(readOnly = true)
     public List<BannerResponse> getAllBanners() {
         log.info("Fetching all banners");
@@ -77,7 +98,6 @@ public class BannerService {
                 .toList();
     }
 
-    // ✅ DELETE BANNER
     public void deleteBanner(Long id) {
         log.warn("Deleting banner ID {}", id);
 
@@ -91,7 +111,6 @@ public class BannerService {
         log.info("Banner deleted successfully ID {}", id);
     }
 
-    // ✅ UPDATE BANNER
     public BannerResponse update(
             Long id,
             MultipartFile[] images,
@@ -126,7 +145,7 @@ public class BannerService {
                             throw new RuntimeException("Failed to upload banner image");
                         }
                     })
-                    .toList();
+                    .collect(Collectors.toList());
 
             banner.setImageUrls(newImageKeys);
         }

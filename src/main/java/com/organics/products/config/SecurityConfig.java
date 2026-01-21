@@ -48,8 +48,10 @@ public class SecurityConfig {
                                 "/api/products/byCategory",
                                 "/api/category/Active",
                                 "/swagger-ui/**",
-                                "/v3/api-docs/**"
+                                "/v3/api-docs/**",
+                                "/favicon.ico"
                         ).permitAll()
+                        .requestMatchers("/api/notification/**").authenticated()
 
                         .anyRequest().permitAll()
                 )

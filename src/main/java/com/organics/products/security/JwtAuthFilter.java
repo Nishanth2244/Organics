@@ -33,7 +33,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         String path = request.getServletPath();
 
         return  path.startsWith("/api/auth/admin/forgot-password")
-        ||path.equals("/api/auth/otp/send")
+                || path.equals("/api/auth/otp/send")
                 || path.equals("/api/auth/otp/verify")
                 || path.equals("/api/auth/refresh")
                 || path.equals("/api/auth/logout")
@@ -49,14 +49,25 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             FilterChain filterChain
     ) throws ServletException, IOException {
 
+        String token = null;
         String authHeader = request.getHeader("Authorization");
 
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+        // 1. Check for Token in Header (Standard API calls)
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            token = authHeader.substring(7);
+        }
+        // 2. Check for Token in Query Param (Required for SSE /subscribe)
+        else if (request.getParameter("token") != null) {
+            token = request.getParameter("token");
+        }
+
+        // 3. If no token found anywhere, continue without authentication
+        if (token == null) {
             filterChain.doFilter(request, response);
             return;
         }
 
-        String token = authHeader.substring(7);
+        // --- Standard Validation Logic ---
 
         if (!jwtService.validateToken(token)) {
             SecurityContextHolder.clearContext();

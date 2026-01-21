@@ -44,6 +44,7 @@ public class BannerController {
     public void delete(@PathVariable Long id) {
         bannerService.deleteBanner(id);
     }
+
     @PutMapping(value = "/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<BannerResponse> updateBanner(
             @PathVariable Long id,
@@ -58,5 +59,7 @@ public class BannerController {
                 bannerService.update(id, images, title, description, redirectUrl)
         );
     }
+
+
 
 }

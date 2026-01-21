@@ -3,10 +3,14 @@ package com.organics.products.service;
 import com.organics.products.config.SecurityUtil;
 import com.organics.products.dto.ProductDTO;
 import com.organics.products.entity.*;
+import com.organics.products.exception.BadRequestException;
+import com.organics.products.exception.ResourceNotFoundException;
+import com.organics.products.exception.UnauthorizedException;
 import com.organics.products.respository.*;
 import jakarta.transaction.Transactional;
 import org.springframework.stereotype.Service;
 
+import java.util.Collections;
 import java.util.List;
 
 @Service
@@ -25,7 +29,8 @@ public class WishlistService {
             WishListItemsRepository wishListItemsRepository,
             ProductRepo productRepository,
             InventoryRepository inventoryRepository,
-            S3Service s3Service, DiscountService discountService
+            S3Service s3Service,
+            DiscountService discountService
     ) {
         this.wishlistRepository = wishlistRepository;
         this.wishListItemsRepository = wishListItemsRepository;
@@ -38,7 +43,7 @@ public class WishlistService {
     public ProductDTO addToWishlist(Long productId) {
 
         Long userId = SecurityUtil.getCurrentUserId()
-                .orElseThrow(() -> new RuntimeException("Unauthorized"));
+                .orElseThrow(() -> new UnauthorizedException("Unauthorized"));
 
         Wishlist wishlist = wishlistRepository
                 .findByUserId(userId)
@@ -52,11 +57,11 @@ public class WishlistService {
 
         if (wishListItemsRepository
                 .existsByWishlistIdAndProductId(wishlist.getId(), productId)) {
-            throw new RuntimeException("Product already in wishlist");
+            throw new BadRequestException("Product already in wishlist");
         }
 
         Product product = productRepository.findById(productId)
-                .orElseThrow(() -> new RuntimeException("Product not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Product not found"));
 
         WishListItems item = new WishListItems();
         item.setWishlist(wishlist);
@@ -71,10 +76,14 @@ public class WishlistService {
     public List<ProductDTO> getMyWishlist() {
 
         Long userId = SecurityUtil.getCurrentUserId()
-                .orElseThrow(() -> new RuntimeException("Unauthorized"));
+                .orElseThrow(() -> new UnauthorizedException("Unauthorized"));
 
         Wishlist wishlist = wishlistRepository.findByUserIdWithProducts(userId)
-                .orElseThrow(() -> new RuntimeException("Wishlist is empty"));
+                .orElse(null);
+
+        if (wishlist == null || wishlist.getWishListItems() == null || wishlist.getWishListItems().isEmpty()) {
+            return Collections.emptyList();
+        }
 
         return wishlist.getWishListItems()
                 .stream()
@@ -90,15 +99,23 @@ public class WishlistService {
     public void removeFromWishlist(Long productId) {
 
         Long userId = SecurityUtil.getCurrentUserId()
-                .orElseThrow(() -> new RuntimeException("Unauthorized"));
+                .orElseThrow(() -> new UnauthorizedException("Unauthorized"));
 
         Wishlist wishlist = wishlistRepository.findByUserId(userId)
-                .orElseThrow(() -> new RuntimeException("Wishlist not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Wishlist not found"));
+
+        boolean exists = wishListItemsRepository
+                .existsByWishlistIdAndProductId(wishlist.getId(), productId);
+
+        if (!exists) {
+            throw new ResourceNotFoundException("Product not in wishlist");
+        }
 
         wishListItemsRepository.deleteByWishlistIdAndProductId(
                 wishlist.getId(), productId
         );
     }
+
     private ProductDTO mapToProductDTO(Product product) {
 
         ProductDTO r = new ProductDTO();
@@ -158,6 +175,4 @@ public class WishlistService {
 
         return r;
     }
-
-
 }
