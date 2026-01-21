@@ -3,6 +3,7 @@ package com.organics.products.controller;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -15,6 +16,7 @@ import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @RestController
+@RequestMapping("/api")
 public class PaymentController {
 	
 	@Autowired
@@ -30,7 +32,7 @@ public class PaymentController {
 		OrderResponse orderResponse = paymentService.createOrder(cartId);
 		
 		orderResponse.setKeyId(keyId);
-		log.info("Order created succesfully orderId: {}", orderResponse.getOrderId());
+		log.info("Order created succesfully orderId: {}", orderResponse.getRazorPayOrderId());
 		return orderResponse;
 	}
 

@@ -5,7 +5,7 @@ import lombok.Data;
 @Data
 public class OrderResponse {
 
-    private String orderId;
+    private String razorPayOrderId;
     private Double amount;
     private String keyId;
 
