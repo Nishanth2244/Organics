@@ -43,6 +43,10 @@ public class PaymentService {
 
 	@Value("${razor.key.secret}")
 	private String secretKey;
+	
+	
+	@Autowired
+	private OrderService orderService;
 
 	@Transactional
 	public OrderResponse createOrder(Long orderId) throws RazorpayException {
@@ -111,15 +115,21 @@ public class PaymentService {
 	            payment.setPaymentDate(LocalDate.now());
 	            paymentRepository.save(payment);
 	            
-	            com.organics.products.entity.Order order = new com.organics.products.entity.Order();
+	            com.organics.products.entity.Order order = payment.getOrder(); 
+	            order.setPaymentStatus(PaymentStatus.SUCCESSFUL);
 	            order.setOrderStatus(OrderStatus.CONFIRMED);
 	            orderRepository.save(order);
 	            
-	            log.info("Payment verified and Order confirmed for Order ID: {}", order.getId());
+	            try {
+	                orderService.sendOrderToShiprocket(order.getId());
+	            } catch (Exception e) {
+	                log.error("Payment success but Shiprocket failed: {}", e.getMessage());
+	            }
+	            
+	            log.info("Payment verified and Order confirmed {}", order.getId());
 	            return true;
 			}
-
-					
+	
 		}
 		catch (Exception e) {
 			log.error("Payment verification failed: {}", e.getMessage());
