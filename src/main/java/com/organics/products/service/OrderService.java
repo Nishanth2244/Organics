@@ -95,6 +95,7 @@ public class OrderService {
         order.setOrderAmount(0.0); // Will calculate below
         order.setDescription(orderRequest.getDescription());
         order.setOrderStatus(OrderStatus.PENDING);
+        order.setPaymentStatus(PaymentStatus.PENDING);
         order.setUser(user);
         order.setCart(activeCart);
         order.setShippingAddress(selectedAddress);
@@ -106,7 +107,7 @@ public class OrderService {
         double totalAmount = 0.0;
 
         for (CartItems cartItem : cartItems) {
-            Product product = cartItem.getProduct();
+            Product product = cartItem.getInventory().getProduct();
 
             if (product == null) {
                 throw new RuntimeException("Product not found for cart item: " + cartItem.getId());

@@ -18,16 +18,15 @@ public interface CartRepository extends JpaRepository<Cart, Long>{
 	List<Cart> findByUserAndIsActive(User user, boolean isActive);
 
 
-	@Query("SELECT c FROM Cart c LEFT JOIN FETCH c.items i LEFT JOIN FETCH i.product WHERE c.id = :cartId")
-	Optional<Cart> findByIdWithItems(@Param("cartId") Long cartId);
+    @Query("SELECT c FROM Cart c LEFT JOIN FETCH c.items i LEFT JOIN FETCH i.inventory WHERE c.id = :cartId")
+    Optional<Cart> findByIdWithItems(@Param("cartId") Long cartId);
 
-	@Query("SELECT c FROM Cart c LEFT JOIN FETCH c.items i LEFT JOIN FETCH i.product WHERE c.user = :user AND c.isActive = true")
-	List<Cart> findByUserAndIsActiveWithItems(@Param("user") User user, boolean isActive);
+    @Query("SELECT c FROM Cart c LEFT JOIN FETCH c.items i LEFT JOIN FETCH i.inventory WHERE c.user = :user AND c.isActive = :isActive")
+    List<Cart> findByUserAndIsActiveWithItems(@Param("user") User user, @Param("isActive") boolean isActive);
 
-	@Query("SELECT DISTINCT c FROM Cart c " +
-			"LEFT JOIN FETCH c.items i " +
-			"LEFT JOIN FETCH i.product p " +
-			"WHERE c.user.id = :userId AND c.isActive = true")
-	Optional<Cart> findByIdWithItemsAndUser(@Param("userId") Long userId);
-
+    @Query("SELECT DISTINCT c FROM Cart c " +
+            "LEFT JOIN FETCH c.items i " +
+            "LEFT JOIN FETCH i.inventory inv " +
+            "WHERE c.user.id = :userId AND c.isActive = true")
+    Optional<Cart> findByIdWithItemsAndUser(@Param("userId") Long userId);
 }

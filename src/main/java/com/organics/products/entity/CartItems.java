@@ -22,16 +22,4 @@ public class CartItems {
     @JoinColumn(name = "inventory_id")
     private Inventory inventory;
 
-    @ManyToOne(fetch = FetchType.EAGER) // Ensure product is loaded
-    @JoinColumn(name = "product_id", nullable = false)
-    private Product product;
-
-    @Override
-    public String toString() {
-        return "CartItems{" +
-                "id=" + id +
-                ", quantity=" + quantity +
-                ", product=" + (product != null ? product.getId() : "null") +
-                '}';
-    }
 }

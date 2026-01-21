@@ -182,7 +182,6 @@ public class CartService {
 			CartItems newItem = new CartItems();
 			newItem.setCart(cart);
 			newItem.setInventory(inventory);
-			newItem.setProduct(product); // CRITICAL: Set the product
 			newItem.setQuantity(request.getQuantity());
 			cart.getItems().add(newItem);
 			cartItemRepository.save(newItem);
@@ -196,7 +195,7 @@ public class CartService {
 
 		for (CartItems item : cart.getItems()) {
 
-			Product cartItemProduct = item.getProduct(); // Get product from cart item
+			Product cartItemProduct = item.getInventory().getProduct(); // Get product from cart item
 			int qty = item.getQuantity();
 
 			double mrp = cartItemProduct.getMRP() != null ? cartItemProduct.getMRP() : 0.0;
