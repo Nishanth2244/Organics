@@ -43,7 +43,6 @@ public class ReviewsService {
     @Value("${app.admin.notification-receiver}")
     private String adminReceiver;
 
-    // ================= RATING SUMMARY =================
 
     public RatingSummaryDTO getRatingSummary(Long productId) {
         List<Object[]> result = reviewsRepository.getRatingSummary(productId);
@@ -60,7 +59,6 @@ public class ReviewsService {
         return new RatingSummaryDTO(count, avg);
     }
 
-    // ================= DISABLE REVIEW =================
 
     public void disableReview(Long reviewId) {
 
@@ -70,7 +68,7 @@ public class ReviewsService {
         review.setIsEligible(false);
         reviewsRepository.save(review);
 
-        // ✅ ADMIN notification
+
         notificationService.sendNotification(
                 adminReceiver,
                 "Review ID " + reviewId + " has been disabled",
@@ -157,7 +155,6 @@ public class ReviewsService {
         return mapToDTO(saved);
     }
 
-    // ================= GET PRODUCT REVIEWS =================
 
     public List<ReviewResponseDTO> getProductReviews(Long productId) {
         return reviewsRepository.findByProductIdAndIsEligibleTrue(productId)

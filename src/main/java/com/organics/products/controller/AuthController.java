@@ -1,5 +1,6 @@
 package com.organics.products.controller;
 
+import com.organics.products.dto.CreateAdminRequest;
 import com.organics.products.dto.TokenPair;
 import com.organics.products.service.AuthService;
 import jakarta.servlet.http.Cookie;
@@ -169,6 +170,25 @@ public class AuthController {
         return ResponseEntity.ok(
                 Map.of("message", "Admin password reset successful")
         );
+    }
+
+    @PreAuthorize("hasRole('ADMIN')")
+    @PostMapping("/admin/create")
+    public ResponseEntity<?> createAdmin(@RequestBody CreateAdminRequest request) {
+
+        authService.createAdmin(request);
+
+        return ResponseEntity.ok(
+                Map.of("message", "Admin created successfully")
+        );
+    }
+
+
+    @PreAuthorize("hasRole('ADMIN')")
+    @GetMapping("/admin/all")
+    public ResponseEntity<?> getAllAdmins() {
+
+        return ResponseEntity.ok(authService.getAllAdmins());
     }
 
 }

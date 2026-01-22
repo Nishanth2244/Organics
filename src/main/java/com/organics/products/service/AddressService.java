@@ -6,13 +6,16 @@ import com.organics.products.dto.LocationResponse;
 import com.organics.products.dto.SaveAddressRequest;
 import com.organics.products.entity.Address;
 import com.organics.products.entity.User;
+import com.organics.products.exception.ResourceNotFoundException;
 import com.organics.products.respository.AddressRepository;
 import com.organics.products.respository.UserRepository;
 import jakarta.transaction.Transactional;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 
+@Slf4j
 @Service
 @Transactional
 public class AddressService {
@@ -29,13 +32,22 @@ public class AddressService {
         this.pincodeService = pincodeService;
     }
 
+
     public AddressResponse saveAddress(SaveAddressRequest req) {
 
         Long userId = SecurityUtil.getCurrentUserId()
-                .orElseThrow(() -> new RuntimeException("Unauthorized"));
+                .orElseThrow(() -> {
+                    log.warn("Unauthorized attempt to save address");
+                    return new RuntimeException("User not authenticated");
+                });
+
+        log.info("Saving address for userId={}", userId);
 
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> {
+                    log.warn("User not found for userId={}", userId);
+                    return new ResourceNotFoundException("User not found with id: " + userId);
+                });
 
         LocationResponse location =
                 pincodeService.getByPincode(req.getPinCode());
@@ -58,15 +70,19 @@ public class AddressService {
                 addressRepository.existsByUserIdAndIsPrimaryTrue(userId);
 
         if (Boolean.TRUE.equals(req.getIsPrimary())) {
+            log.info("Setting this address as primary for userId={}", userId);
             addressRepository.clearPrimary(userId);
             address.setIsPrimary(true);
         } else if (!hasPrimary) {
+            log.info("No primary address exists. Setting this as primary for userId={}", userId);
             address.setIsPrimary(true);
         } else {
             address.setIsPrimary(false);
         }
 
         Address saved = addressRepository.save(address);
+        log.info("Address saved successfully. addressId={}, userId={}", saved.getId(), userId);
+
         return mapToResponse(saved);
     }
 
@@ -74,10 +90,25 @@ public class AddressService {
     public List<AddressResponse> getMyAddresses() {
 
         Long userId = SecurityUtil.getCurrentUserId()
-                .orElseThrow(() -> new RuntimeException("Unauthorized"));
+                .orElseThrow(() -> {
+                    log.warn("Unauthorized attempt to fetch addresses");
+                    return new RuntimeException("User not authenticated");
+                });
+
+        log.info("Fetching addresses for userId={}", userId);
 
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> {
+                    log.warn("User not found for userId={}", userId);
+                    return new ResourceNotFoundException("User not found with id: " + userId);
+                });
+
+        if (user.getAddresses() == null || user.getAddresses().isEmpty()) {
+            log.info("No addresses found for userId={}", userId);
+            return List.of();
+        }
+
+        log.info("Found {} addresses for userId={}", user.getAddresses().size(), userId);
 
         return user.getAddresses()
                 .stream()
@@ -89,12 +120,21 @@ public class AddressService {
     public AddressResponse updateAddress(Long addressId, SaveAddressRequest req) {
 
         Long userId = SecurityUtil.getCurrentUserId()
-                .orElseThrow(() -> new RuntimeException("Unauthorized"));
+                .orElseThrow(() -> {
+                    log.warn("Unauthorized attempt to update address");
+                    return new RuntimeException("User not authenticated");
+                });
+
+        log.info("Updating addressId={} for userId={}", addressId, userId);
 
         Address address = addressRepository.findById(addressId)
-                .orElseThrow(() -> new RuntimeException("Address not found"));
+                .orElseThrow(() -> {
+                    log.warn("Address not found. addressId={}", addressId);
+                    return new ResourceNotFoundException("Address not found with id: " + addressId);
+                });
 
         if (!address.getUser().getId().equals(userId)) {
+            log.warn("UserId={} tried to update addressId={} not owned by them", userId, addressId);
             throw new RuntimeException("You cannot update this address");
         }
 
@@ -114,11 +154,14 @@ public class AddressService {
         address.setLongitude(req.getLongitude());
 
         if (Boolean.TRUE.equals(req.getIsPrimary())) {
+            log.info("Setting addressId={} as primary for userId={}", addressId, userId);
             addressRepository.clearPrimary(userId);
             address.setIsPrimary(true);
         }
 
         Address updated = addressRepository.save(address);
+        log.info("Address updated successfully. addressId={}, userId={}", updated.getId(), userId);
+
         return mapToResponse(updated);
     }
 
@@ -126,23 +169,36 @@ public class AddressService {
     public void deleteAddress(Long addressId) {
 
         Long userId = SecurityUtil.getCurrentUserId()
-                .orElseThrow(() -> new RuntimeException("Unauthorized"));
+                .orElseThrow(() -> {
+                    log.warn("Unauthorized attempt to delete address");
+                    return new RuntimeException("User not authenticated");
+                });
+
+        log.info("Deleting addressId={} for userId={}", addressId, userId);
 
         Address address = addressRepository.findById(addressId)
-                .orElseThrow(() -> new RuntimeException("Address not found"));
+                .orElseThrow(() -> {
+                    log.warn("Address not found. addressId={}", addressId);
+                    return new ResourceNotFoundException("Address not found with id: " + addressId);
+                });
 
         if (!address.getUser().getId().equals(userId)) {
+            log.warn("UserId={} tried to delete addressId={} not owned by them", userId, addressId);
             throw new RuntimeException("You cannot delete this address");
         }
 
         boolean wasPrimary = Boolean.TRUE.equals(address.getIsPrimary());
         addressRepository.delete(address);
 
+        log.info("Address deleted successfully. addressId={}, userId={}", addressId, userId);
+
         if (wasPrimary) {
+            log.info("Deleted address was primary. Assigning new primary for userId={}", userId);
             addressRepository.findFirstByUserIdOrderByIdAsc(userId)
                     .ifPresent(a -> {
                         a.setIsPrimary(true);
                         addressRepository.save(a);
+                        log.info("New primary address set. addressId={}, userId={}", a.getId(), userId);
                     });
         }
     }

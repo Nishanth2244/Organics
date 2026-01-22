@@ -20,11 +20,7 @@ public class Notification implements Serializable {
 
     private String receiver;
 
-    @Column(name = "user_id")
-    private Long userId;
 
-    @Column(name = "admin_id")
-    private Long adminId;
 
     @Lob
     @Column(columnDefinition = "text")

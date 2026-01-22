@@ -46,15 +46,18 @@ public class NotificationPushService {
         return emitter;
     }
 
-    // Unsubscribe a user
-    public String unSubscribe(String userId) {
+    public void unSubscribe(String userId) {
+
         List<SseEmitter> userEmitters = emitters.remove(userId);
+
         if (userEmitters != null) {
             userEmitters.forEach(SseEmitter::complete);
+            log.info("User {} unsubscribed", userId);
+        } else {
+            log.warn("Unsubscribe called but no active SSE for user {}", userId);
         }
-        log.info("User {} unsubscribed", userId);
-        return "Unsubscribed " + userId;
     }
+
 
     // Send data to a specific user
     public void sendNotificationToUser(String userId, Object notification) {

@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 import com.organics.products.entity.*;
+import com.organics.products.exception.ProductNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,7 +19,6 @@ import com.organics.products.respository.InventoryRepository;
 import com.organics.products.respository.ProductRepo;
 
 import lombok.extern.slf4j.Slf4j;
-
 @Slf4j
 @Service
 @Transactional
@@ -36,13 +36,11 @@ public class ProductService {
 	@Autowired
 	private DiscountService discountService;
 
-
-
-
 	@Autowired
 	private InventoryRepository inventoryRepository;
 
 	private ProductDTO convertToDTO(Product product) {
+
 		ProductDTO dto = new ProductDTO();
 
 		dto.setId(product.getId());
@@ -67,7 +65,9 @@ public class ProductService {
 			dto.setImageUrls(urls);
 		}
 
-		List<Inventory> inventories = inventoryRepository.findByProductId(product.getId());
+		List<Inventory> inventories =
+				inventoryRepository.findByProductId(product.getId());
+
 		if (!inventories.isEmpty()) {
 			dto.setInventoryId(inventories.get(0).getId());
 			dto.setAvailableStock(inventories.get(0).getAvailableStock());
@@ -79,7 +79,9 @@ public class ProductService {
 		if (finalPrice < product.getMRP()) {
 			dto.setDiscountAmount(product.getMRP() - finalPrice);
 
-			Discount appliedDiscount = discountService.getApplicableDiscount(product);
+			Discount appliedDiscount =
+					discountService.getApplicableDiscount(product);
+
 			if (appliedDiscount != null) {
 				dto.setDiscountType(appliedDiscount.getDiscountType());
 			}
@@ -90,14 +92,25 @@ public class ProductService {
 
 		return dto;
 	}
-	
-	
 
 
-	public ProductDTO add(Long categoryId, MultipartFile[] images, String productName, String brand, String description,Integer returnDays, Double mrp, UnitType unitType, Double netWeight) throws IOException {
+	public ProductDTO add(Long categoryId,
+						  MultipartFile[] images,
+						  String productName,
+						  String brand,
+						  String description,
+						  Integer returnDays,
+						  Double mrp,
+						  UnitType unitType,
+						  Double netWeight) throws IOException {
+
+		log.info("Adding product: {}", productName);
 
 		Category category = categoryRepo.findById(categoryId)
-				.orElseThrow(() -> new ResourceNotFoundException("Category not found"));
+				.orElseThrow(() -> {
+					log.warn("Category not found for id: {}", categoryId);
+					return new ProductNotFoundException("Category not found: " + categoryId);
+				});
 
 		Product product = new Product();
 		product.setProductName(productName);
@@ -110,98 +123,127 @@ public class ProductService {
 		product.setUnit(unitType);
 		product.setNetWeight(netWeight);
 
-
 		Product savedProduct = productRepo.save(product);
 
 		List<ProductImage> imageList = new ArrayList<>();
 
-		for (MultipartFile file : images) {
-			String url = s3Service.uploadFile(file);
+		if (images != null && images.length > 0) {
+			for (MultipartFile file : images) {
+				String url = s3Service.uploadFile(file);
 
-			ProductImage img = new ProductImage();
-			img.setImageUrl(url);
-			img.setProduct(savedProduct);
+				ProductImage img = new ProductImage();
+				img.setImageUrl(url);
+				img.setProduct(savedProduct);
 
-			imageList.add(img);
+				imageList.add(img);
+			}
 		}
 
 		savedProduct.setImages(imageList);
 		Product finalProduct = productRepo.save(savedProduct);
 
+		log.info("Product created with id: {}", finalProduct.getId());
+
 		return convertToDTO(finalProduct);
 	}
-	
-	
-	
+
 
 	public void inActive(Long id, Boolean status) {
 
+		log.info("Updating product status: id={}, status={}", id, status);
+
 		Product product = productRepo.findById(id)
-				.orElseThrow(() -> new ResourceNotFoundException("Product not found to inActive: " + id));
+				.orElseThrow(() -> {
+					log.warn("Product not found for inActive: {}", id);
+					return new ProductNotFoundException("Product not found: " + id);
+				});
 
 		product.setStatus(status);
 		productRepo.save(product);
+
+		log.info("Product {} status updated to {}", id, status);
 	}
-	
-	
+
 
 	public List<ProductDTO> activeProd() {
 
+		log.info("Fetching active products");
+
 		List<Product> products = productRepo.findByStatusTrue();
 
-		return products.stream().map(this::convertToDTO).collect(Collectors.toList());
+		if (products.isEmpty()) {
+			log.warn("No active products found");
+			return List.of(); // production-safe empty list
+		}
+
+		return products.stream()
+				.map(this::convertToDTO)
+				.collect(Collectors.toList());
 	}
-	
-	
-	
+
 
 	public List<ProductDTO> getInActive() {
 
+		log.info("Fetching inactive products");
+
 		List<Product> products = productRepo.findByStatusFalse();
 
-		return products.stream().map(this::convertToDTO).collect(Collectors.toList());
-	}
-	
-	
+		if (products.isEmpty()) {
+			log.warn("No inactive products found");
+			return List.of();
+		}
 
-	public Product updateProduct(Long id, MultipartFile[] images, String productName, String brand, String description,
-								 Integer returnDays, Double mrp, Long categoryId, UnitType unitType, Double netWeight) throws IOException {
+		return products.stream()
+				.map(this::convertToDTO)
+				.collect(Collectors.toList());
+	}
+
+
+	public Product updateProduct(Long id,
+								 MultipartFile[] images,
+								 String productName,
+								 String brand,
+								 String description,
+								 Integer returnDays,
+								 Double mrp,
+								 Long categoryId,
+								 UnitType unitType,
+								 Double netWeight) throws IOException {
+
+		log.info("Updating product: {}", id);
 
 		Product product = productRepo.findById(id)
-				.orElseThrow(() -> new ResourceNotFoundException("Product not found with id: " + id));
+				.orElseThrow(() -> {
+					log.warn("Product not found for update: {}", id);
+					return new ProductNotFoundException("Product not found: " + id);
+				});
 
-		if (productName != null)
-			product.setProductName(productName);
-		if (brand != null)
-			product.setBrand(brand);
-		if (description != null)
-			product.setDescription(description);
-		if (returnDays != null)
-			product.setReturnDays(returnDays);
-		if (mrp != null)
-			product.setMRP(mrp);
-
-		if(unitType != null) {
-			product.setUnit(unitType);
-		}
-
-		if(netWeight != null) {
-			product.setNetWeight(netWeight);
-		}
-
+		if (productName != null) product.setProductName(productName);
+		if (brand != null) product.setBrand(brand);
+		if (description != null) product.setDescription(description);
+		if (returnDays != null) product.setReturnDays(returnDays);
+		if (mrp != null) product.setMRP(mrp);
+		if (unitType != null) product.setUnit(unitType);
+		if (netWeight != null) product.setNetWeight(netWeight);
 
 		if (categoryId != null) {
 			Category category = categoryRepo.findById(categoryId)
-					.orElseThrow(() -> new ResourceNotFoundException("Category not found"));
+					.orElseThrow(() -> {
+						log.warn("Category not found: {}", categoryId);
+						return new ProductNotFoundException("Category not found: " + categoryId);
+					});
+
 			product.setCategory(category);
 		}
 
 		if (images != null && images.length > 0) {
+
+			log.info("Updating product images: {}", id);
+
 			if (product.getImages() != null) {
 				for (ProductImage oldImg : product.getImages()) {
 					s3Service.deleteFile(oldImg.getImageUrl());
 				}
-
 				product.getImages().clear();
 			} else {
 				product.setImages(new ArrayList<>());
@@ -209,6 +251,7 @@ public class ProductService {
 
 			for (MultipartFile file : images) {
 				String url = s3Service.uploadFile(file);
+
 				ProductImage img = new ProductImage();
 				img.setImageUrl(url);
 				img.setProduct(product);
@@ -217,35 +260,54 @@ public class ProductService {
 			}
 		}
 
-		return productRepo.save(product);
+		Product updated = productRepo.save(product);
+
+		log.info("Product updated successfully: {}", id);
+
+		return updated;
 	}
-	
-	
+
 
 	public List<ProductDTO> byCategory(Long categoryId) {
 
+		log.info("Fetching products by category: {}", categoryId);
+
 		Category category = categoryRepo.findById(categoryId)
-				.orElseThrow(() -> new ResourceNotFoundException("Category not Found"));
+				.orElseThrow(() -> {
+					log.warn("Category not found: {}", categoryId);
+					return new ProductNotFoundException("Category not found: " + categoryId);
+				});
 
-		List<Product> products = productRepo.findByCategoryId(category.getId());
-
-		return products.stream().map(this::convertToDTO).collect(Collectors.toList());
-	}
-
-	
-	
-	public List<ProductDTO> searchByName(String name) {
-
-		List<Product> products = productRepo.findByProductNameContainingIgnoreCaseAndStatusTrue(name);
+		List<Product> products =
+				productRepo.findByCategoryId(category.getId());
 
 		if (products.isEmpty()) {
-			throw new ResourceNotFoundException("Products not found with this name in search: " + name);
+			log.warn("No products found in category: {}", categoryId);
+			return List.of();
 		}
 
 		return products.stream()
 				.map(this::convertToDTO)
-				.collect(Collectors
-						.toList());
+				.collect(Collectors.toList());
 	}
 
+
+	public List<ProductDTO> searchByName(String name) {
+
+		log.info("Searching products by name: {}", name);
+
+		List<Product> products =
+				productRepo.findByProductNameContainingIgnoreCaseAndStatusTrue(name);
+
+		if (products.isEmpty()) {
+			log.warn("No products found for search: {}", name);
+			throw new ProductNotFoundException(
+					"Products not found with name: " + name
+			);
+		}
+
+		return products.stream()
+				.map(this::convertToDTO)
+				.collect(Collectors.toList());
+	}
 }

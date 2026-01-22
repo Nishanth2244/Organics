@@ -26,36 +26,4 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
 
     List<Notification> findByDeletedTrue();
 
-    // 🔧 ADMIN inbox (ALL)
-    @Query("""
-       SELECT n FROM Notification n
-       WHERE (n.adminId = :adminId OR n.receiver = :receiver)
-         AND n.deleted = false
-       ORDER BY n.createdAt DESC
-    """)
-    Page<Notification> findAdminInbox(@Param("adminId") Long adminId,
-                                      @Param("receiver") String receiver,
-                                      Pageable pageable);
-
-    // 🔧 ADMIN unread
-    @Query("""
-       SELECT n FROM Notification n
-       WHERE (n.adminId = :adminId OR n.receiver = :receiver)
-         AND n.read = false
-         AND n.deleted = false
-       ORDER BY n.createdAt DESC
-    """)
-    Page<Notification> findAdminInboxUnread(@Param("adminId") Long adminId,
-                                            @Param("receiver") String receiver,
-                                            Pageable pageable);
-
-    // 🔧 ADMIN unread count
-    @Query("""
-       SELECT COUNT(n) FROM Notification n
-       WHERE (n.adminId = :adminId OR n.receiver = :receiver)
-         AND n.read = false
-         AND n.deleted = false
-    """)
-    Long countAdminUnread(@Param("adminId") Long adminId,
-                          @Param("receiver") String receiver);
 }

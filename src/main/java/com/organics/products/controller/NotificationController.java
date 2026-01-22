@@ -129,7 +129,6 @@ public class NotificationController {
         return "done";
     }
 
-    // 🔁 DTO APPLIED
     @GetMapping("/all")
     public ResponseEntity<List<NotificationDTO>> getAll(
             @RequestParam(defaultValue = "0") Integer page,
@@ -191,14 +190,17 @@ public class NotificationController {
     }
 
     @GetMapping("/unSubscribe")
-    public String unSubscribe() {
+    public ResponseEntity<Void> unSubscribe() {
 
         String userId = SecurityUtil.getCurrentUserId()
                 .map(String::valueOf)
                 .orElseThrow(() -> new RuntimeException("Unauthorized"));
 
-        return pushService.unSubscribe(userId);
+        pushService.unSubscribe(userId);
+
+        return ResponseEntity.noContent().build(); // 👈 IMPORTANT
     }
+
 
     // ADMIN / DEBUG ONLY
     @GetMapping("/deletedMessages")
@@ -211,9 +213,7 @@ public class NotificationController {
         return notificationService.deletedMessage();
     }
 
-    // ============================
-    // 🔧 DTO MAPPER
-    // ============================
+
 
     private NotificationDTO toDTO(Notification n) {
         return new NotificationDTO(

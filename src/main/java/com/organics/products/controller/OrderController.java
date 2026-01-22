@@ -1,9 +1,6 @@
 package com.organics.products.controller;
 
-import com.organics.products.dto.DailyOrderStatsDTO;
-import com.organics.products.dto.OrderDTO;
-import com.organics.products.dto.OrderAddressRequestDTO;
-import com.organics.products.dto.ShiprocketTrackingResponse;
+import com.organics.products.dto.*;
 import com.organics.products.entity.OrderStatus;
 import com.organics.products.service.OrderService;
 import lombok.extern.slf4j.Slf4j;
@@ -52,18 +49,18 @@ public class OrderController {
         return ResponseEntity.ok(trackingInfo);
     }
 
-    @GetMapping("/{orderId}/label")
-    public ResponseEntity<byte[]> getShippingLabel(@PathVariable Long orderId) {
-        byte[] label = orderService.getShippingLabel(orderId);
+//    @GetMapping("/{orderId}/label")
+//    public ResponseEntity<byte[]> getShippingLabel(@PathVariable Long orderId) {
+//        byte[] label = orderService.getShippingLabel(orderId);
+//
+//        return ResponseEntity.ok()
+//                .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_PDF_VALUE)
+//                .header(HttpHeaders.CONTENT_DISPOSITION,
+//                        "attachment; filename=\"shipping_label_" + orderId + ".pdf\"")
+//                .body(label);
+//    }
 
-        return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_PDF_VALUE)
-                .header(HttpHeaders.CONTENT_DISPOSITION,
-                        "attachment; filename=\"shipping_label_" + orderId + ".pdf\"")
-                .body(label);
-    }
 
-    // Admin endpoint
     @PutMapping("/{orderId}/status")
     public ResponseEntity<OrderDTO> updateOrderStatus(
             @PathVariable Long orderId,
@@ -134,5 +131,30 @@ public class OrderController {
     public ResponseEntity<Map<String, Object>> getMonthlyOrderCount() {
         Map<String, Object> count = orderService.getMonthlyOrderCount();
         return ResponseEntity.ok(count);
+    }
+
+    // Add these endpoints to your OrderController class
+
+    @GetMapping("/admin/topproducts")
+    public ResponseEntity<List<TopOrderedProductsDTO>> getTopOrderedProducts(
+            @RequestParam(required = false) Integer limit,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @RequestParam(required = false) Long inventoryId) {
+
+        List<TopOrderedProductsDTO> topProducts = orderService.getTopOrderedProducts(limit, startDate, endDate, inventoryId);
+        return ResponseEntity.ok(topProducts);
+    }
+
+    @GetMapping("/admin/top-products/last30days")
+    public ResponseEntity<List<TopOrderedProductsDTO>> getTopOrderedProductsLast30Days() {
+        List<TopOrderedProductsDTO> topProducts = orderService.getTopOrderedProductsLast30Days();
+        return ResponseEntity.ok(topProducts);
+    }
+
+    @GetMapping("/admin/topproducts/thismonth")
+    public ResponseEntity<List<TopOrderedProductsDTO>> getTopOrderedProductsThisMonth() {
+        List<TopOrderedProductsDTO> topProducts = orderService.getTopOrderedProductsThisMonth();
+        return ResponseEntity.ok(topProducts);
     }
 }

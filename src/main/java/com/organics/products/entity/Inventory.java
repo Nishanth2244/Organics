@@ -50,4 +50,6 @@ public class Inventory {
     void onCreate() {
         this.updatedAt = LocalDateTime.now();
     }
+    @Version
+    private Long version;
 }

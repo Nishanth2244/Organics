@@ -36,6 +36,7 @@ public class ReviewsController {
     }
 
 
+
     @PutMapping("/admin/disable/{reviewId}")
     public void disableReview(@PathVariable Long reviewId) {
         reviewsService.disableReview(reviewId);
