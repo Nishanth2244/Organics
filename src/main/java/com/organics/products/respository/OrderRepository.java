@@ -1,5 +1,6 @@
 package com.organics.products.respository;
 
+import com.organics.products.dto.CategoryRevenueDTO;
 import com.organics.products.entity.Order;
 import com.organics.products.entity.OrderStatus;
 import com.organics.products.entity.User;
@@ -73,4 +74,15 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
 
     @Query("SELECT SUM(o.orderAmount) FROM Order o WHERE o.orderStatus = :status AND o.orderDate >= :startDate")
     Double getRevenueByStatusAndDate(@Param("status") OrderStatus status, @Param("startDate") LocalDate startDate);
+    
+    @Query("SELECT new com.organics.products.dto.CategoryRevenueDTO(c.categoryName, SUM(oi.price * oi.quantity)) " +
+    	       "FROM Order o " +
+    	       "JOIN o.orderItems oi " +
+    	       "JOIN oi.product p " +
+    	       "JOIN p.category c " +
+    	       "WHERE MONTH(o.orderDate) = :month " +
+    	       "AND YEAR(o.orderDate) = :year " +
+    	       "AND o.orderStatus = 'DELIVERED' " +
+    	       "GROUP BY c.categoryName")
+    	List<CategoryRevenueDTO> getCategoryRevenueByMonth(@Param("month") int month, @Param("year") int year);
 }

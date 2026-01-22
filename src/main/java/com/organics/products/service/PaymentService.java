@@ -129,10 +129,12 @@ public class PaymentService {
 				com.organics.products.entity.Order order = payment.getOrder();
 				order.setPaymentStatus(PaymentStatus.SUCCESSFUL);
 				order.setOrderStatus(OrderStatus.CONFIRMED);
+				log.info("order place and updating status to {}", OrderStatus.CONFIRMED);
+				
 				orderRepository.save(order);
 
 				
-//				Disable cart after payment succesfull.
+//				Disable cart after payment successful.
 				Cart cart = order.getCart();
 				if (cart != null) {
 					cart.setActive(false);

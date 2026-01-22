@@ -12,6 +12,7 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 import com.organics.products.dto.*;
+import com.organics.products.dto.*;
 import com.organics.products.entity.*;
 import com.organics.products.respository.*;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -230,7 +231,7 @@ public class OrderService {
 
         log.info("Order placed successfully. Order ID: {}, Amount: {}, Tax: {}, Discount: {}",
                 savedOrder.getId(), grandTotal, totalTax, totalDiscount);
-        savedOrder.setOrderStatus(OrderStatus.PENDING);
+        //savedOrder.setOrderStatus(OrderStatus.PENDING);
         orderRepository.save(savedOrder);
 
 
@@ -253,7 +254,8 @@ public class OrderService {
                 savedOrder.setShiprocketCourierName(shiprocketResponse.getCourierName());
             }
 
-            savedOrder.setOrderStatus(OrderStatus.PENDING);
+            //savedOrder.setOrderStatus(OrderStatus.PENDING);
+
 
             log.info("Shiprocket order created successfully!");
 
@@ -264,7 +266,7 @@ public class OrderService {
             if (errorMessage != null && errorMessage.length() > 200) {
                 errorMessage = errorMessage.substring(0, 200);
             }
-            savedOrder.setOrderStatus(OrderStatus.PENDING);
+            //savedOrder.setOrderStatus(OrderStatus.PENDING);
             savedOrder.setShiprocketOrderId("FAILED: " + errorMessage);
 
             log.warn("Order saved locally. Shiprocket error: {}", errorMessage);
@@ -878,7 +880,7 @@ public class OrderService {
                 order.setShiprocketShipmentId(shiprocketResponse.getShipmentId());
                 order.setShiprocketAwbCode(shiprocketResponse.getAwbCode());
                 order.setShiprocketTrackingUrl("https://shiprocket.co/tracking/" + shiprocketResponse.getAwbCode());
-                order.setOrderStatus(OrderStatus.PENDING); // Ikada confirm chestunnam
+                //order.setOrderStatus(OrderStatus.PENDING); // Ikada confirm chestunnam
                 orderRepository.save(order);
                 log.info("✅ Shiprocket order created successfully for Order ID: {}", orderId);
             }
