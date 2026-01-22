@@ -13,7 +13,7 @@ import com.organics.products.dto.OrderResponse;
 import com.organics.products.exception.ResourceNotFoundException;
 import com.organics.products.respository.CartRepository;
 import com.organics.products.respository.OrderRepository;
-import com.organics.products.respository.PaymentRepository;
+import com.organics.products.respository.PaymentRepository;    
 import com.razorpay.Order;
 import com.razorpay.RazorpayClient;
 import com.razorpay.RazorpayException;
@@ -21,7 +21,7 @@ import com.razorpay.Utils;
 
 import jakarta.transaction.Transactional;
 import lombok.extern.slf4j.Slf4j;
-
+    
 @Slf4j
 @Service
 public class PaymentService {
@@ -40,6 +40,8 @@ public class PaymentService {
 
 	@Value("${razor.key.secret}")
 	private String secretKey;
+	@Autowired
+	private OrderService orderService;
 
 	@Autowired
 	private NotificationService notificationService;
@@ -100,6 +102,11 @@ public class PaymentService {
 	@Transactional
 	public boolean verifyPayment(String razorpayOrderId, String razorpayPaymentId, String razorpaySignature) {
 
+		Payment payment = paymentRepository.findByRazorpayOrderId(razorpayOrderId);
+		if (payment == null) {
+			throw new ResourceNotFoundException("Payment record not found");
+		}
+
 		try {
 			JSONObject verifyRequest = new JSONObject();
 			verifyRequest.put("razorpay_order_id", razorpayOrderId);
@@ -109,12 +116,6 @@ public class PaymentService {
 			boolean isValid = Utils.verifyPaymentSignature(verifyRequest, secretKey);
 
 			if (isValid) {
-				Payment payment = paymentRepository.findByRazorpayOrderId(razorpayOrderId);
-
-				if(payment == null) {
-					throw new ResourceNotFoundException("Payment record not found");
-				}
-
 				com.razorpay.Payment razorpayPayment = razorpayClient.payments.fetch(razorpayPaymentId);
 				String method = razorpayPayment.get("method");
 
@@ -127,45 +128,48 @@ public class PaymentService {
 
 				com.organics.products.entity.Order order = payment.getOrder();
 				order.setPaymentStatus(PaymentStatus.SUCCESSFUL);
+				order.setOrderStatus(OrderStatus.CONFIRMED);
 				orderRepository.save(order);
-				notificationService.sendNotification(
-						String.valueOf(order.getUser().getId()),
-						"Payment successful for Order #" + order.getId(),
-						"SYSTEM",
-						"SUCCESS",
-						"/orders/" + order.getId(),
-						"PAYMENT",
-						"SYSTEM",
-						"Payment Successful",
-						EntityType.PAYMENT,
-						payment.getId()
-				);
 
+				
+//				Disable cart after payment succesfull.
+				Cart cart = order.getCart();
+				if (cart != null) {
+					cart.setActive(false);
+					cartRepository.save(cart);
+				}
 
-				log.info("Payment verified and Order confirmed for Order ID: {}", order.getId());
+				
+//				shiprocket call
+				try {
+					orderService.sendOrderToShiprocket(order.getId());
+				} catch (Exception e) {
+					log.error("Payment success but Shiprocket failed: {}", e.getMessage());
+				}
+
+				log.info("Payment verified and Order confirmed {}", order.getId());
 				return true;
+			} else {
+				updatePaymentAsFailed(payment);
+				return false;
 			}
 
-
-		}
-		catch (Exception e) {
+		} catch (Exception e) {
 			log.error("Payment verification failed: {}", e.getMessage());
-			notificationService.sendNotification(
-					String.valueOf(SecurityUtil.getCurrentUserId().orElse(0L)),
-					"Payment verification failed. Please retry.",
-					"SYSTEM",
-					"ERROR",
-					"/orders",
-					"PAYMENT",
-					"SYSTEM",
-					"Payment Failed",
-					EntityType.PAYMENT,
-					null
-			);
-
+			updatePaymentAsFailed(payment);
+			return false;
 		}
-		return false;
+	}
 
+	private void updatePaymentAsFailed(Payment payment) {
+		payment.setPaymentStatus(PaymentStatus.FAILED);
+		paymentRepository.save(payment);
+
+		com.organics.products.entity.Order order = payment.getOrder();
+		if (order != null) {
+			order.setPaymentStatus(PaymentStatus.FAILED);
+			orderRepository.save(order);
+		}
 	}
 
 }

@@ -1,4 +1,3 @@
-// OrderDTO.java
 package com.organics.products.dto;
 
 import com.organics.products.entity.OrderStatus;
@@ -18,6 +17,9 @@ public class OrderDTO {
     private String userEmail;
     private String userPhone;
 
+    private String paymentStatus;
+    private String razorpayOrderId;
+
     private ShippingAddressDTO shippingAddress;
 
     // Shiprocket fields
@@ -32,4 +34,11 @@ public class OrderDTO {
     //private String shippingAddress;
 
     private List<OrderItemDTO> orderItems;
+
+    private Double subtotal;               // Sum of all items (price × quantity)
+    private Double totalTax;               // Sum of all taxes
+    private Double itemDiscount;           // Discount from individual items (MRP - Selling Price)
+    private Double cartDiscount;           // Cart-level discounts (coupons, etc.)
+    private Double totalDiscount;          // itemDiscount + cartDiscount
+    private Double grandTotal;
 }

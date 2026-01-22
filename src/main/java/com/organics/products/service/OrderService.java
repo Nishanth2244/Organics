@@ -1,23 +1,33 @@
 package com.organics.products.service;
 
-import com.organics.products.dto.*;
-
+import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.stream.Collectors;
 
 import com.organics.products.entity.*;
-import com.organics.products.exception.ResourceNotFoundException;
-import com.organics.products.config.SecurityUtil;
-
 import com.organics.products.respository.*;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDate;
-import java.time.temporal.ChronoUnit;
-import java.util.*;
-import java.util.stream.Collectors;
+import com.organics.products.config.SecurityUtil;
+import com.organics.products.dto.DailyOrderStatsDTO;
+import com.organics.products.dto.OrderAddressRequestDTO;
+import com.organics.products.dto.OrderDTO;
+import com.organics.products.dto.OrderItemDTO;
+import com.organics.products.dto.ShippingAddressDTO;
+import com.organics.products.dto.ShiprocketCreateOrderResponse;
+import com.organics.products.dto.ShiprocketTrackingResponse;
+import com.organics.products.exception.ResourceNotFoundException;
+
+import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @Service
@@ -40,10 +50,16 @@ public class OrderService {
     private ProductRepo productRepository;
 
     @Autowired
+    private InventoryService inventoryService;
+
+    @Autowired
     private CartItemRepository cartItemRepository;
 
     @Autowired
     private ShiprocketService shiprocketService;
+
+    @Autowired
+    private InventoryRepository inventoryRepository;
 
     @Autowired
     private S3Service s3Service;
@@ -54,7 +70,7 @@ public class OrderService {
 
 
     //@Autowired
-    //private WarehouseRepository warehouseRepository; // For pickup address
+    //private WarehouseRepository warehouseRepository;
 
     @Transactional
     public OrderDTO placeOrder(OrderAddressRequestDTO orderRequest) {
@@ -92,10 +108,42 @@ public class OrderService {
             throw new RuntimeException("Cart is empty. Cannot place order.");
         }
 
-        // Create order FIRST
+        // **1. CHECK STOCK AVAILABILITY AND RESERVE STOCK**
+        List<Inventory> inventoriesToReserve = new ArrayList<>();
+        Map<Long, Integer> productQuantities = new HashMap<>();
+
+        for (CartItems cartItem : cartItems) {
+            // Get product from cart item
+            Product product = cartItem.getInventory().getProduct();
+
+            // Find inventory for this product (assuming single branch for now)
+            // If you have multiple branches, you need logic to pick the right branch
+            List<Inventory> inventories = inventoryRepository.findByProductId(product.getId());
+
+            if (inventories.isEmpty()) {
+                throw new RuntimeException("No inventory found for product: " + product.getProductName());
+            }
+
+            // For simplicity, use first inventory (you might need logic for branch selection)
+            Inventory inventory = inventories.get(0);
+
+            // Check if enough stock is available
+            if (inventory.getAvailableStock() < cartItem.getQuantity()) {
+                throw new RuntimeException("Insufficient stock for product: " +
+                        product.getProductName() +
+                        ". Available: " + inventory.getAvailableStock() +
+                        ", Requested: " + cartItem.getQuantity());
+            }
+
+            // Store for reservation
+            inventoriesToReserve.add(inventory);
+            productQuantities.put(inventory.getId(), cartItem.getQuantity());
+        }
+
+        // Create order
         Order order = new Order();
         order.setOrderDate(LocalDate.now());
-        order.setOrderAmount(0.0); // Will calculate below
+        order.setOrderAmount(0.0);
         order.setDescription(orderRequest.getDescription());
         order.setOrderStatus(OrderStatus.PENDING);
         order.setPaymentStatus(PaymentStatus.PENDING);
@@ -108,69 +156,114 @@ public class OrderService {
         // Create order items from cart items and calculate total
         List<OrderItems> orderItemsList = new ArrayList<>();
         double totalAmount = 0.0;
+        double totalTax = 0.0;
+        double totalDiscount = 0.0;
 
         for (CartItems cartItem : cartItems) {
             Product product = cartItem.getInventory().getProduct();
-
-            if (product == null) {
-                throw new RuntimeException("Product not found for cart item: " + cartItem.getId());
-            }
 
             OrderItems orderItem = new OrderItems();
             orderItem.setOrder(savedOrder);
             orderItem.setProduct(product);
             orderItem.setQuantity(cartItem.getQuantity());
 
+            // Get actual product prices
             Double mrp = product.getMRP();
-            Double afterDiscount = product.getMRP(); // Should this be getDiscountedPrice()?
+            Double sellingPrice = cartItem.getCart().getPayableAmount();
 
-            double price = (afterDiscount != null) ? afterDiscount :
-                    (mrp != null) ? mrp : 0.0;
+            // If afterDiscount is not set or 0, use MRP
+            if (sellingPrice == null || sellingPrice == 0.0) {
+                sellingPrice = mrp;
+            }
+
+            // Ensure we have a valid price
+            double price = sellingPrice != null ? sellingPrice :
+                    (mrp != null ? mrp : 0.0);
+
+            if (price <= 0) {
+                throw new RuntimeException("Invalid price for product: " + product.getProductName());
+            }
 
             orderItem.setPrice(price);
 
-            if (mrp != null && afterDiscount != null) {
-                orderItem.setDiscount(mrp - afterDiscount);
-            } else {
-                orderItem.setDiscount(0.0);
+            // Calculate discount per item (MRP - Selling Price)
+            double discountPerItem = 0.0;
+            if (mrp != null && sellingPrice != null && mrp > sellingPrice) {
+                discountPerItem = mrp - sellingPrice;
             }
+            orderItem.setDiscount(discountPerItem);
 
-            orderItem.setTax(price * 0.05);
+            // Calculate tax (5% GST on selling price)
+            double taxPerItem = price * 0.05; // 5% GST
+            orderItem.setTax(taxPerItem);
+
+            // Calculate totals
+            double itemTotal = price * cartItem.getQuantity();
+            double itemDiscount = discountPerItem * cartItem.getQuantity();
+            double itemTax = taxPerItem * cartItem.getQuantity();
+
+            totalAmount += itemTotal;
+            totalDiscount += itemDiscount;
+            totalTax += itemTax;
 
             orderItemsList.add(orderItem);
-            totalAmount += price * cartItem.getQuantity();
         }
 
         if (orderItemsList.isEmpty()) {
             throw new RuntimeException("No valid items to create order.");
         }
 
-        // Update order amount
-        savedOrder.setOrderAmount(totalAmount);
+        // Apply cart-level discounts (from coupons, etc.)
+        Double cartDiscount = activeCart.getDiscountAmount();
+        if (cartDiscount != null && cartDiscount > 0) {
+            totalDiscount += cartDiscount;
+        }
+
+        // Calculate final payable amount
+        double grandTotal = totalAmount;
+
+        // Verify with cart's payable amount (optional validation)
+        Double cartPayableAmount = activeCart.getPayableAmount();
+        if (cartPayableAmount != null && Math.abs(cartPayableAmount - grandTotal) > 1.0) {
+            log.warn("Cart payable amount (${}) differs from calculated amount (${})",
+                    cartPayableAmount, grandTotal);
+        }
+
+        // Update order amount with grand total
+        savedOrder.setOrderAmount(grandTotal);
+
+        // **2. RESERVE STOCK FOR ORDER (PENDING STATE)**
+        for (Inventory inventory : inventoriesToReserve) {
+            Integer quantity = productQuantities.get(inventory.getId());
+            try {
+                inventoryService.reserveStock(inventory.getId(), quantity, savedOrder.getId());
+                log.info("Stock reserved for product {}: {} units. Available: {}, Reserved: {}",
+                        inventory.getProduct().getProductName(), quantity,
+                        inventory.getAvailableStock() - quantity,
+                        inventory.getReservedStock() + quantity);
+            } catch (Exception e) {
+                // If reservation fails, roll back the order
+                orderRepository.delete(savedOrder);
+                throw new RuntimeException("Failed to reserve stock for product: " +
+                        inventory.getProduct().getProductName() + ". " + e.getMessage());
+            }
+        }
 
         // Save all order items
         orderItemsRepository.saveAll(orderItemsList);
         savedOrder.setOrderItems(orderItemsList);
 
-        // **IMPORTANT: Clear cart items BEFORE saving cart**
-        // Detach cart items from cart first
-        activeCart.getItems().clear();
+        // **DO NOT clear cart here - wait for payment success**
+        log.info("Order placed successfully. Order ID: {}, Amount: {}, Tax: {}, Discount: {}",
+                savedOrder.getId(), grandTotal, totalTax, totalDiscount);
 
-        // Save cart to persist the cleared items state
-        cartRepository.save(activeCart);
+        // Mark order as PENDING (waiting for payment)
+        savedOrder.setOrderStatus(OrderStatus.PENDING);
+        orderRepository.save(savedOrder);
 
-        // **THEN** delete the cart items
-        cartItemRepository.deleteAll(cartItems);
 
-        // Deactivate the cart
-        activeCart.setActive(false);
-        activeCart.setTotalAmount(0.0);
-        activeCart.setPayableAmount(0.0);
-        activeCart.setDiscountAmount(0.0);
-        cartRepository.save(activeCart);
 
-        log.info("Order placed successfully. Order ID: {}, Amount: {}", savedOrder.getId(), totalAmount);
-        // Integrate with Shiprocket for shipping
+
         try {
             ShiprocketCreateOrderResponse shiprocketResponse = shiprocketService.createOrder(savedOrder, user, selectedAddress);
 
@@ -211,7 +304,7 @@ public class OrderService {
         } catch (Exception e) {
             log.error("Failed to create Shiprocket order: {}", e.getMessage());
 
-            // Store only first 200 chars of error
+
             String errorMessage = e.getMessage();
             if (errorMessage != null && errorMessage.length() > 200) {
                 errorMessage = errorMessage.substring(0, 200);
@@ -507,6 +600,7 @@ public class OrderService {
         dto.setOrderAmount(order.getOrderAmount());
         dto.setDescription(order.getDescription());
         dto.setOrderStatus(order.getOrderStatus());
+        dto.setPaymentStatus(dto.getPaymentStatus());
         dto.setUserId(order.getUser().getId());
 
         // User details
@@ -519,7 +613,7 @@ public class OrderService {
         dto.setUserEmail(user.getEmailId());
         dto.setUserPhone(user.getPhoneNumber());
 
-        // ✅ Shipping Address - Add this
+        // Shipping Address
         if (order.getShippingAddress() != null) {
             Address address = order.getShippingAddress();
             ShippingAddressDTO addressDTO = new ShippingAddressDTO();
@@ -547,9 +641,20 @@ public class OrderService {
         dto.setShiprocketCourierName(order.getShiprocketCourierName());
         dto.setShiprocketLabelUrl(order.getShiprocketLabelUrl());
         dto.setShiprocketTrackingUrl(order.getShiprocketTrackingUrl());
+        
+        dto.setPaymentStatus(String.valueOf(order.getPaymentStatus()));
 
-        // Order items
+        // Payment details
+        if (order.getPayment() != null) {
+            dto.setRazorpayOrderId(order.getPayment().getRazorpayOrderId());
+        }
+
+        // Order items with proper calculations
         List<OrderItemDTO> itemDTOs = new ArrayList<>();
+        double orderSubtotal = 0.0;
+        double orderItemDiscount = 0.0;
+        double orderTax = 0.0;
+
         if (order.getOrderItems() != null) {
             for (OrderItems item : order.getOrderItems()) {
                 OrderItemDTO itemDTO = new OrderItemDTO();
@@ -559,11 +664,41 @@ public class OrderService {
                 itemDTO.setPrice(item.getPrice());
                 itemDTO.setTax(item.getTax());
                 itemDTO.setDiscount(item.getDiscount());
-                itemDTO.setTotalPrice(item.getPrice() * item.getQuantity());
+
+                // Calculate totals per item
+                double itemTotal = item.getPrice() * item.getQuantity();
+                double itemTax = item.getTax() * item.getQuantity();
+                double itemDiscount = item.getDiscount() * item.getQuantity();
+
+                // Line total (price + tax - discount)
+                double lineTotal = itemTotal + itemTax - itemDiscount;
+                itemDTO.setTotalPrice(lineTotal);
+
+                // Add to order totals
+                orderSubtotal += itemTotal;
+                orderTax += itemTax;
+                orderItemDiscount += itemDiscount;
+
                 itemDTOs.add(itemDTO);
             }
         }
         dto.setOrderItems(itemDTOs);
+
+        // Get cart-level discount if available
+        double cartLevelDiscount = 0.0;
+        if (order.getCart() != null && order.getCart().getDiscountAmount() != null) {
+            cartLevelDiscount = order.getCart().getDiscountAmount();
+        }
+
+        double totalDiscount = orderItemDiscount + cartLevelDiscount;
+
+        // Add summary fields to DTO
+        dto.setSubtotal(orderSubtotal);
+        dto.setTotalTax(orderTax);
+        dto.setItemDiscount(orderItemDiscount);
+        dto.setCartDiscount(cartLevelDiscount);
+        dto.setTotalDiscount(totalDiscount);
+        dto.setGrandTotal(order.getOrderAmount()); // This is the final payable amount
 
         return dto;
     }
@@ -862,5 +997,30 @@ public class OrderService {
         Address pickupAddress = getWarehouseAddress();
 
         return shiprocketService.checkServiceability(pickupAddress, deliveryAddress, 1.0);
+    }
+    
+    
+    @Transactional
+    public void sendOrderToShiprocket(Long orderId) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new ResourceNotFoundException("Order not found"));
+
+        try {
+            ShiprocketCreateOrderResponse shiprocketResponse = shiprocketService.createOrder(order, order.getUser(), order.getShippingAddress());
+            
+            if (shiprocketResponse.getOrderId() != null && shiprocketResponse.getOrderId() > 0) {
+                order.setShiprocketOrderId(String.valueOf(shiprocketResponse.getOrderId()));
+                order.setShiprocketShipmentId(shiprocketResponse.getShipmentId());
+                order.setShiprocketAwbCode(shiprocketResponse.getAwbCode());
+                order.setShiprocketTrackingUrl("https://shiprocket.co/tracking/" + shiprocketResponse.getAwbCode());
+                order.setOrderStatus(OrderStatus.CONFIRMED); // Ikada confirm chestunnam
+                orderRepository.save(order);
+                log.info("✅ Shiprocket order created successfully for Order ID: {}", orderId);
+            }
+        } catch (Exception e) {
+            log.error("❌ Failed to send order to Shiprocket: {}", e.getMessage());
+            // Optional: Payment success ayindi kabatti order status CONFIRMED gane unchali, 
+            // kaani Shiprocket error ni log cheyali manually process cheyadaniki.
+        }
     }
 }
