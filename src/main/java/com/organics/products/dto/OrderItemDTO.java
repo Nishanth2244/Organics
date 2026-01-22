@@ -13,5 +13,4 @@ public class OrderItemDTO {
     private Double tax;
     private Double discount;
     private Double totalPrice;
-    private String imageUrl;
 }
