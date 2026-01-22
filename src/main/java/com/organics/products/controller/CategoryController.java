@@ -7,6 +7,7 @@ import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -18,6 +19,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.organics.products.dto.CategoryDTO;
+import com.organics.products.dto.CategoryRevenueDTO;
 import com.organics.products.entity.Category;
 import com.organics.products.service.CategoryService;
 
@@ -88,6 +90,17 @@ public class CategoryController {
 
 		List<CategoryDTO> categories = categoryService.getInActive();
 		return categories;
+	}
+	
+	@GetMapping("/admin/revenue/category-monthly")
+	public ResponseEntity<List<CategoryRevenueDTO>> getCategoryRevenueByMonth(
+	        @RequestParam int month,
+	        @RequestParam(required = false) Integer year) {
+	    
+	    int targetYear = (year != null) ? year : java.time.LocalDate.now().getYear();
+	    
+	    List<CategoryRevenueDTO> revenueData = categoryService.getCategoryRevenueByMonth(month, targetYear);
+	    return ResponseEntity.ok(revenueData);
 	}
 
 }

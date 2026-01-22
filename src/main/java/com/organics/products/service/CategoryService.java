@@ -9,12 +9,15 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.organics.products.config.SecurityUtil;
 import com.organics.products.dto.CategoryDTO;
+import com.organics.products.dto.CategoryRevenueDTO;
 import com.organics.products.entity.Category;
 import com.organics.products.entity.Product;
 import com.organics.products.exception.AlreadyExistsException;
 import com.organics.products.exception.ResourceNotFoundException;
 import com.organics.products.respository.CategoryRepo;
+import com.organics.products.respository.OrderRepository;
 import com.organics.products.respository.ProductRepo;
 
 import lombok.extern.java.Log;
@@ -32,6 +35,9 @@ public class CategoryService {
 	
 	@Autowired
 	private ProductRepo productRepo;
+	
+	@Autowired
+	private OrderRepository orderRepository;
 	
 	
 	private CategoryDTO convertToDTO(Category category) {
@@ -121,5 +127,12 @@ public class CategoryService {
 				.map(this::convertToDTO)
 				.collect(Collectors.toList());
 	}
-
+	
+	
+	public List<CategoryRevenueDTO> getCategoryRevenueByMonth(int month, int year) {
+//	    if (!SecurityUtil.isAdmin()) {
+//	        throw new RuntimeException("Unauthorized: Admin access required");
+//	    }
+	    return orderRepository.getCategoryRevenueByMonth(month, year);
+	}
 }
