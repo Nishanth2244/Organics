@@ -21,8 +21,8 @@ public class NotificationProducer {
     private RedisTemplate redisTemplate;
 
     public void sendNotification(Notification notification) {
-        String topic = "notifications";
-        String key = notification.getReceiver();
+//        String topic = "notifications";
+//        String key = notification.getReceiver();
         log.info("Notification received and sending to redis: {}", notification);
 
 //        CompletableFuture<SendResult<String, Notification>> future = kafkaTemplate.send(topic, key, notification);

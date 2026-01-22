@@ -1,6 +1,7 @@
 package com.organics.products.service;
 
 import com.organics.products.config.SecurityUtil;
+import com.organics.products.entity.EntityType;
 import com.organics.products.entity.Notification;
 import com.organics.products.respository.NotificationRepository;
 import jakarta.transaction.Transactional;
@@ -44,7 +45,9 @@ public class NotificationService {
                                  String link,
                                  String category,
                                  String kind,
-                                 String subject) {
+                                 String subject,
+                                 EntityType entityType,
+                                 Long entityId) {
 
         Notification notification = Notification.builder()
                 .receiver(receiver)
@@ -57,6 +60,8 @@ public class NotificationService {
                 .category(category)
                 .kind(kind)
                 .subject(subject)
+                .entityType(entityType)
+                .entityId(entityId)
                 .stared(false)
                 .deleted(false)
                 .build();

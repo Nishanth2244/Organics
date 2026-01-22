@@ -2,6 +2,7 @@ package com.organics.products.service;
 
 import java.time.LocalDate;
 
+import com.organics.products.entity.*;
 import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -9,10 +10,6 @@ import org.springframework.stereotype.Service;
 
 import com.organics.products.config.SecurityUtil;
 import com.organics.products.dto.OrderResponse;
-import com.organics.products.entity.Cart;
-import com.organics.products.entity.OrderStatus;
-import com.organics.products.entity.Payment;
-import com.organics.products.entity.PaymentStatus;
 import com.organics.products.exception.ResourceNotFoundException;
 import com.organics.products.respository.CartRepository;
 import com.organics.products.respository.OrderRepository;
@@ -43,6 +40,10 @@ public class PaymentService {
 
 	@Value("${razor.key.secret}")
 	private String secretKey;
+
+	@Autowired
+	private NotificationService notificationService;
+
 
 	@Transactional
 	public OrderResponse createOrder(Long orderId) throws RazorpayException {
@@ -78,6 +79,19 @@ public class PaymentService {
 		orderResponse.setRazorPayOrderId(order.get("id"));
 
 		paymentRepository.save(payment);
+		notificationService.sendNotification(
+				String.valueOf(userId),
+				"Payment initiated for Order #" + orderId,
+				"SYSTEM",
+				"INFO",
+				"/orders/" + orderId,
+				"PAYMENT",
+				"SYSTEM",
+				"Payment Initiated",
+				EntityType.PAYMENT,
+				payment.getId()
+		);
+
 
 		log.info("Payment details saved");
 		return orderResponse;
@@ -114,6 +128,19 @@ public class PaymentService {
 				com.organics.products.entity.Order order = payment.getOrder();
 				order.setPaymentStatus(PaymentStatus.SUCCESSFUL);
 				orderRepository.save(order);
+				notificationService.sendNotification(
+						String.valueOf(order.getUser().getId()),
+						"Payment successful for Order #" + order.getId(),
+						"SYSTEM",
+						"SUCCESS",
+						"/orders/" + order.getId(),
+						"PAYMENT",
+						"SYSTEM",
+						"Payment Successful",
+						EntityType.PAYMENT,
+						payment.getId()
+				);
+
 
 				log.info("Payment verified and Order confirmed for Order ID: {}", order.getId());
 				return true;
@@ -123,6 +150,19 @@ public class PaymentService {
 		}
 		catch (Exception e) {
 			log.error("Payment verification failed: {}", e.getMessage());
+			notificationService.sendNotification(
+					String.valueOf(SecurityUtil.getCurrentUserId().orElse(0L)),
+					"Payment verification failed. Please retry.",
+					"SYSTEM",
+					"ERROR",
+					"/orders",
+					"PAYMENT",
+					"SYSTEM",
+					"Payment Failed",
+					EntityType.PAYMENT,
+					null
+			);
+
 		}
 		return false;
 

@@ -1,22 +1,61 @@
-// src/main/java/com/example/notifications/repository/NotificationRepository.java
-
 package com.organics.products.respository;
 
 import com.organics.products.entity.Notification;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 
 public interface NotificationRepository extends JpaRepository<Notification, Long> {
 
-
     Page<Notification> findByReceiverAndReadFalse(String receiver, Pageable pageable);
 
-    Page<Notification> findNonChatNotificationsByReceiver(String receiver, Pageable pageable);
+    @Query("""
+       SELECT n FROM Notification n
+       WHERE n.receiver = :receiver
+         AND n.deleted = false
+         AND n.category <> 'CHAT'
+    """)
+    Page<Notification> findNonChatNotificationsByReceiver(@Param("receiver") String receiver,
+                                                          Pageable pageable);
 
     Long countNonChatUnreadByReceiver(String receiver);
 
     List<Notification> findByDeletedTrue();
+
+    // 🔧 ADMIN inbox (ALL)
+    @Query("""
+       SELECT n FROM Notification n
+       WHERE (n.adminId = :adminId OR n.receiver = :receiver)
+         AND n.deleted = false
+       ORDER BY n.createdAt DESC
+    """)
+    Page<Notification> findAdminInbox(@Param("adminId") Long adminId,
+                                      @Param("receiver") String receiver,
+                                      Pageable pageable);
+
+    // 🔧 ADMIN unread
+    @Query("""
+       SELECT n FROM Notification n
+       WHERE (n.adminId = :adminId OR n.receiver = :receiver)
+         AND n.read = false
+         AND n.deleted = false
+       ORDER BY n.createdAt DESC
+    """)
+    Page<Notification> findAdminInboxUnread(@Param("adminId") Long adminId,
+                                            @Param("receiver") String receiver,
+                                            Pageable pageable);
+
+    // 🔧 ADMIN unread count
+    @Query("""
+       SELECT COUNT(n) FROM Notification n
+       WHERE (n.adminId = :adminId OR n.receiver = :receiver)
+         AND n.read = false
+         AND n.deleted = false
+    """)
+    Long countAdminUnread(@Param("adminId") Long adminId,
+                          @Param("receiver") String receiver);
 }

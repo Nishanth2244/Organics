@@ -2,12 +2,14 @@
 package com.organics.products.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.organics.products.config.SecurityUtil;
 import com.organics.products.config.ShiprocketConfigProperties;
 import com.organics.products.dto.*;
 import com.organics.products.entity.*;
 import com.organics.products.exception.ShiprocketException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -28,13 +30,15 @@ public class ShiprocketService {
     private final WebClient webClient;
     private final ShiprocketConfigProperties config;
     private final ObjectMapper objectMapper;
+    private final NotificationService notificationService;
 
     private String authToken;
     private LocalDateTime tokenExpiry;
     private String cachedToken;
-
+    @Value("${app.admin.notification-receiver}")
+    private String adminReceiver;
     @Autowired
-    public ShiprocketService(ShiprocketConfigProperties config, ObjectMapper objectMapper) {
+    public ShiprocketService(ShiprocketConfigProperties config, ObjectMapper objectMapper, NotificationService notificationService) {
         this.config = config;
         this.objectMapper = objectMapper;
 
@@ -43,6 +47,7 @@ public class ShiprocketService {
                 .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                 .defaultHeader("User-Agent", "OrganicProducts/1.0")
                 .build();
+        this.notificationService = notificationService;
 
         log.info("✅ Shiprocket Service initialized. IP whitelisting is working!");
     }
@@ -248,14 +253,73 @@ public class ShiprocketService {
 
             // Parse the JSON response
             Map<String, Object> response = objectMapper.readValue(responseJson, Map.class);
+            ShiprocketCreateOrderResponse result = parseCreateOrderResponse(response);
 
-            return parseCreateOrderResponse(response);
+            // ✅ USER notification
+            notificationService.sendNotification(
+                    String.valueOf(order.getUser().getId()),
+                    "Your order #" + order.getId() + " has been handed over for shipping.",
+                    "SYSTEM",
+                    "SUCCESS",
+                    "/orders/" + order.getId(),
+                    "SHIPMENT",
+                    "SYSTEM",
+                    "Shipment Created",
+                    EntityType.SHIPMENT,
+                    result.getShipmentId()
+            );
+
+            // ✅ ADMIN notification
+            notificationService.sendNotification(
+                    adminReceiver,
+                    "Shipment created for Order #" + order.getId(),
+                    "SYSTEM",
+                    "INFO",
+                    "/admin/shipments",
+                    "SHIPMENT",
+                    "SYSTEM",
+                    "Shipment Created",
+                    EntityType.SHIPMENT,
+                    result.getShipmentId()
+            );
+
+            return result;
 
         } catch (Exception e) {
             log.error("❌ Failed to create Shiprocket order: {}", e.getMessage());
+
+            // ❌ USER notification
+            notificationService.sendNotification(
+                    String.valueOf(order.getUser().getId()),
+                    "Shipping setup failed for Order #" + order.getId() + ". We will retry shortly.",
+                    "SYSTEM",
+                    "ERROR",
+                    "/orders/" + order.getId(),
+                    "SHIPMENT",
+                    "SYSTEM",
+                    "Shipment Failed",
+                    EntityType.SHIPMENT,
+                    null
+            );
+
+            // ❌ ADMIN notification
+            notificationService.sendNotification(
+                    adminReceiver,
+                    "Shiprocket failed for Order #" + order.getId(),
+                    "SYSTEM",
+                    "ALERT",
+                    "/admin/orders/" + order.getId(),
+                    "SHIPMENT",
+                    "SYSTEM",
+                    "Shipment Failed",
+                    EntityType.SHIPMENT,
+                    null
+            );
+
             throw new ShiprocketException("Failed to create Shiprocket order: " + e.getMessage(), e);
         }
     }
+
 
     private ShiprocketCreateOrderResponse parseCreateOrderResponse(Map<String, Object> response) {
         if (response == null) {
@@ -638,18 +702,67 @@ public class ShiprocketService {
 
             log.info("Cancelling shipment ID: {}", shipmentId);
 
-            return webClient.post()
+            Map<String, Object> response = webClient.post()
                     .uri("/orders/cancel")
                     .header("Authorization", "Bearer " + token)
                     .bodyValue(request)
                     .retrieve()
                     .bodyToMono(Map.class)
                     .block();
+
+            notificationService.sendNotification(
+                    adminReceiver,
+                    "Shipment ID " + shipmentId + " has been cancelled.",
+                    "SYSTEM",
+                    "ALERT",
+                    "/admin/shipments",
+                    "SHIPMENT",
+                    "SYSTEM",
+                    "Shipment Cancelled",
+                    EntityType.SHIPMENT,
+                    shipmentId
+            );
+
+            String userReceiver = getCurrentUserReceiver();
+
+            if (userReceiver != null) {
+                notificationService.sendNotification(
+                        userReceiver,
+                        "Your shipment (ID: " + shipmentId + ") has been cancelled.",
+                        "SYSTEM",
+                        "WARNING",
+                        "/orders",
+                        "SHIPMENT",
+                        "SYSTEM",
+                        "Shipment Cancelled",
+                        EntityType.SHIPMENT,
+                        shipmentId
+                );
+            }
+
+            return response;
+
         } catch (Exception e) {
             log.error("Error cancelling shipment: {}", e.getMessage());
+
+            // ❌ ADMIN failure notification
+            notificationService.sendNotification(
+                    adminReceiver,
+                    "Failed to cancel Shipment ID " + shipmentId,
+                    "SYSTEM",
+                    "ERROR",
+                    "/admin/shipments",
+                    "SHIPMENT",
+                    "SYSTEM",
+                    "Shipment Cancel Failed",
+                    EntityType.SHIPMENT,
+                    shipmentId
+            );
+
             throw new ShiprocketException("Failed to cancel shipment: " + e.getMessage());
         }
     }
+
 
     private String formatAddress(Address address) {
         StringBuilder sb = new StringBuilder();
@@ -694,17 +807,73 @@ public class ShiprocketService {
 
             log.info("Scheduling pickup for shipment ID: {} on {}", shipmentId, pickupDate);
 
-            return webClient.post()
+            Map<String, Object> response = webClient.post()
                     .uri("/courier/generate/pickup")
                     .header("Authorization", "Bearer " + token)
                     .bodyValue(request)
                     .retrieve()
                     .bodyToMono(Map.class)
                     .block();
+
+            // ✅ ADMIN notification
+            notificationService.sendNotification(
+                    adminReceiver,
+                    "Pickup scheduled for Shipment ID " + shipmentId + " on " + pickupDate,
+                    "SYSTEM",
+                    "INFO",
+                    "/admin/shipments",
+                    "SHIPMENT",
+                    "SYSTEM",
+                    "Pickup Scheduled",
+                    EntityType.SHIPMENT,
+                    shipmentId
+            );
+
+            String userReceiver = getCurrentUserReceiver();
+
+            if (userReceiver != null) {
+                notificationService.sendNotification(
+                        userReceiver,
+                        "Pickup scheduled for your shipment (ID: " + shipmentId + ") on " + pickupDate,
+                        "SYSTEM",
+                        "SUCCESS",
+                        "/orders",
+                        "SHIPMENT",
+                        "SYSTEM",
+                        "Pickup " +
+                                "Scheduled",
+                        EntityType.SHIPMENT,
+                        shipmentId
+                );
+            }
+
+
+            return response;
+
         } catch (Exception e) {
             log.error("Error scheduling pickup: {}", e.getMessage());
+
+            // ❌ ADMIN failure notification
+            notificationService.sendNotification(
+                    adminReceiver,
+                    "Failed to schedule pickup for Shipment ID " + shipmentId,
+                    "SYSTEM",
+                    "ERROR",
+                    "/admin/shipments",
+                    "SHIPMENT",
+                    "SYSTEM",
+                    "Pickup Failed",
+                    EntityType.SHIPMENT,
+                    shipmentId
+            );
+
             throw new ShiprocketException("Failed to schedule pickup: " + e.getMessage());
         }
+    }
+    private String getCurrentUserReceiver() {
+        return SecurityUtil.getCurrentUserId()
+                .map(String::valueOf)
+                .orElse(null);
     }
 
 

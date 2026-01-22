@@ -2,6 +2,7 @@ package com.organics.products.service;
 
 import com.organics.products.dto.BannerResponse;
 import com.organics.products.entity.Banner;
+import com.organics.products.entity.EntityType;
 import com.organics.products.entity.User;
 import com.organics.products.respository.BannerRepository;
 import com.organics.products.respository.UserRepository;
@@ -72,16 +73,20 @@ public class BannerService {
 
         for (User user : users) {
             notificationService.sendNotification(
-                    String.valueOf(user.getId()),    // Receiver ID
-                    "New Offer: " + saved.getTitle(),// Message
-                    "Admin",                         // Sender
-                    "PROMO",                         // Type
-                    saved.getRedirectUrl(),          // Link
-                    "MARKETING",                     // Category
-                    "INFO",                          // Kind
-                    "Check out our new updates!"     // Subject
+                    String.valueOf(user.getId()),          // Receiver
+                    "New Offer: " + saved.getTitle(),      // Message
+                    "ADMIN",                               // Sender
+                    "PROMO",                               // Type (severity)
+                    saved.getRedirectUrl(),                // Link
+                    "MARKETING",                           // Category (UI)
+                    "SYSTEM",                              // Kind (who triggered)
+                    "New Banner Available!",
+                    EntityType.BANNER,// Subject
+
+                    saved.getId()                          // 🔹 DOMAIN ID
             );
         }
+
 
         log.info("Banner created and notifications sent. Banner ID {}", saved.getId());
         log.info("Banner created successfully with ID {}", saved.getId());

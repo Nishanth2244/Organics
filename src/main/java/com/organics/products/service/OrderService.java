@@ -49,6 +49,9 @@ public class OrderService {
     private S3Service s3Service;
     @Autowired
     private AddressRepository addressRepository; // Add this
+    @Autowired
+    private NotificationService notificationService;
+
 
     //@Autowired
     //private WarehouseRepository warehouseRepository; // For pickup address
@@ -190,6 +193,18 @@ public class OrderService {
             }
 
             savedOrder.setOrderStatus(OrderStatus.CONFIRMED);
+            notificationService.sendNotification(
+                    String.valueOf(user.getId()),
+                    "Your order #" + savedOrder.getId() + " is confirmed and will be shipped soon.",
+                    "SYSTEM",
+                    "SUCCESS",
+                    "/orders/" + savedOrder.getId(),
+                    "ORDER",
+                    "SYSTEM",
+                    "Order Confirmed",
+                    EntityType.ORDER,
+                    savedOrder.getId()
+            );
 
             log.info("✅ Shiprocket order created successfully!");
 
@@ -203,6 +218,19 @@ public class OrderService {
             }
 
             savedOrder.setOrderStatus(OrderStatus.PENDING);
+            notificationService.sendNotification(
+                    String.valueOf(user.getId()),
+                    "Your order #" + savedOrder.getId() + " is placed but shipping setup is pending.",
+                    "SYSTEM",
+                    "WARNING",
+                    "/orders/" + savedOrder.getId(),
+                    "ORDER",
+                    "SYSTEM",
+                    "Shipping Pending",
+                    EntityType.ORDER,
+                    savedOrder.getId()
+            );
+
             savedOrder.setShiprocketOrderId("FAILED: " + errorMessage);
 
             log.warn("Order saved locally. Shiprocket error: {}", errorMessage);
@@ -218,6 +246,18 @@ public class OrderService {
             savedOrder.setShiprocketTrackingUrl(null);
             orderRepository.save(savedOrder);
         }
+        notificationService.sendNotification(
+                String.valueOf(user.getId()),
+                "Your order #" + savedOrder.getId() + " has been placed successfully.",
+                "SYSTEM",
+                "INFO",
+                "/orders/" + savedOrder.getId(),
+                "ORDER",
+                "SYSTEM",
+                "Order Placed",
+                EntityType.ORDER,
+                savedOrder.getId()
+        );
         return convertToOrderDTO(savedOrder);
     }
     private Cart getActiveCartWithItems(Long userId) {
@@ -349,6 +389,19 @@ public class OrderService {
         }
 
         Order updatedOrder = orderRepository.save(order);
+        notificationService.sendNotification(
+                String.valueOf(order.getUser().getId()),
+                "Your order #" + orderId + " status updated to " + status,
+                "ADMIN",
+                "INFO",
+                "/orders/" + orderId,
+                "ORDER",
+                "ADMIN",
+                "Order Status Updated",
+                EntityType.ORDER,
+                orderId
+        );
+
 
         log.info("Order {} status updated to {}", orderId, status);
 

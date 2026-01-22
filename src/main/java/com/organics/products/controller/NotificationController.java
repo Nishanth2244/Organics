@@ -1,6 +1,7 @@
 package com.organics.products.controller;
 
 import com.organics.products.config.SecurityUtil;
+import com.organics.products.dto.NotificationDTO;
 import com.organics.products.entity.Notification;
 import com.organics.products.service.NotificationPushService;
 import com.organics.products.service.NotificationService;
@@ -42,9 +43,10 @@ public class NotificationController {
                 notification.getLink(),
                 notification.getCategory(),
                 notification.getKind(),
-                notification.getSubject()
+                notification.getSubject(),
+                notification.getEntityType(),
+                notification.getEntityId()
         );
-
         return ResponseEntity.ok("Notification sent");
     }
 
@@ -67,15 +69,18 @@ public class NotificationController {
                     notification.getLink(),
                     notification.getCategory(),
                     notification.getKind(),
-                    notification.getSubject()
+                    notification.getSubject(),
+                    notification.getEntityType(),
+                    notification.getEntityId()
             );
         }
 
         return ResponseEntity.ok("Notifications sent");
     }
 
+    // 🔁 DTO APPLIED
     @GetMapping("/unread")
-    public ResponseEntity<List<Notification>> getUnread(
+    public ResponseEntity<List<NotificationDTO>> getUnread(
             @RequestParam(defaultValue = "0") Integer page,
             @RequestParam(defaultValue = "10") Integer size) {
 
@@ -85,6 +90,9 @@ public class NotificationController {
 
         return ResponseEntity.ok(
                 notificationService.getUnreadNotifications(userId, page, size)
+                        .stream()
+                        .map(this::toDTO)
+                        .toList()
         );
     }
 
@@ -121,8 +129,9 @@ public class NotificationController {
         return "done";
     }
 
+    // 🔁 DTO APPLIED
     @GetMapping("/all")
-    public ResponseEntity<List<Notification>> getAll(
+    public ResponseEntity<List<NotificationDTO>> getAll(
             @RequestParam(defaultValue = "0") Integer page,
             @RequestParam(defaultValue = "10") Integer size) {
 
@@ -132,6 +141,9 @@ public class NotificationController {
 
         return ResponseEntity.ok(
                 notificationService.getAllNotifications(userId, page, size)
+                        .stream()
+                        .map(this::toDTO)
+                        .toList()
         );
     }
 
@@ -197,5 +209,29 @@ public class NotificationController {
         }
 
         return notificationService.deletedMessage();
+    }
+
+    // ============================
+    // 🔧 DTO MAPPER
+    // ============================
+
+    private NotificationDTO toDTO(Notification n) {
+        return new NotificationDTO(
+                n.getId(),
+                n.getReceiver(),
+                n.getMessage(),
+                n.getType(),
+                n.isRead(),
+                n.getSender(),
+                n.getLink(),
+                n.getCategory(),
+                n.getKind(),
+                n.isStared(),
+                n.getSubject(),
+                n.getDeleted(),
+                n.getCreatedAt(),
+                n.getEntityType(),
+                n.getEntityId()
+        );
     }
 }
