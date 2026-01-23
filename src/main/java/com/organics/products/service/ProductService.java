@@ -164,7 +164,7 @@ public class ProductService {
 	
 	
 
-	public Product updateProduct(Long id, MultipartFile[] images, String productName, String brand, String description,
+	public ProductDTO  updateProduct(Long id, MultipartFile[] images, String productName, String brand, String description,
 								 Integer returnDays, Double mrp, Long categoryId, UnitType unitType, Double netWeight) throws IOException {
 
 		Product product = productRepo.findById(id)
@@ -217,7 +217,8 @@ public class ProductService {
 			}
 		}
 
-		return productRepo.save(product);
+		Product savedProduct = productRepo.save(product);
+	    return convertToDTO(savedProduct);
 	}
 	
 	

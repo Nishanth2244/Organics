@@ -50,7 +50,8 @@ public class PaymentService {
 	@Transactional
 	public OrderResponse createOrder(Long orderId) throws RazorpayException {
 
-		Long userId = SecurityUtil.getCurrentUserId().orElseThrow(() -> new RuntimeException("User not authenticated"));
+		Long userId = SecurityUtil.getCurrentUserId()
+				.orElseThrow(() -> new RuntimeException("User not authenticated"));
 
 		com.organics.products.entity.Order ExistingOrder = orderRepository.findById(orderId)
 				.orElseThrow(() -> new ResourceNotFoundException("orderId not found to do payment: " + orderId));
@@ -62,7 +63,7 @@ public class PaymentService {
 		Double amount = ExistingOrder.getOrderAmount();
 
 		JSONObject orderRequest = new JSONObject();
-		orderRequest.put("amount", amount * 100);
+		orderRequest.put("amount", Math.round(amount * 100));
 		orderRequest.put("currency", "INR");
 		orderRequest.put("receipt", "ORDER_" + orderId);
 
