@@ -86,7 +86,7 @@ public class ProductController {
 
 
 	@PutMapping(value = "/update/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-	public Product updateProduct(@PathVariable Long id,
+	public ProductDTO updateProduct(@PathVariable Long id,
 	        @RequestPart(value = "images", required = false) MultipartFile[] images,
 	        @RequestParam(value = "productName", required = false) String productName,
 	        @RequestParam(value = "brand", required = false) String brand,

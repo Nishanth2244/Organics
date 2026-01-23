@@ -20,6 +20,8 @@ public class OrderItems {
     private Double price;
     private Double tax;
     private Double discount;
+    
+    
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "order_id", nullable = false)
     private Order order;

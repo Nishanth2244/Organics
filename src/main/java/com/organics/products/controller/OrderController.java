@@ -3,6 +3,10 @@ package com.organics.products.controller;
 import com.organics.products.dto.*;
 import com.organics.products.entity.OrderStatus;
 import com.organics.products.service.OrderService;
+import com.organics.products.service.PaymentService;
+import com.razorpay.RazorpayException;
+
+import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -24,6 +28,13 @@ public class OrderController {
 
     @Autowired
     private OrderService orderService;
+    
+    
+    @Autowired
+    private PaymentService paymentService;
+    
+	@Value("${razor.key.id}")
+	private String keyId;
 
     @PostMapping("/place")
     public ResponseEntity<OrderDTO> placeOrder(@RequestBody OrderAddressRequestDTO orderRequest) {
@@ -158,4 +169,19 @@ public class OrderController {
         List<TopOrderedProductsDTO> topProducts = orderService.getTopOrderedProductsThisMonth();
         return ResponseEntity.ok(topProducts);
     }
+    
+    
+    @PostMapping("/buy-now")
+    public OrderResponse buyNow(@Valid @RequestBody BuyNowRequestDTO buyNowRequestDTO) throws RazorpayException {
+    	
+    	OrderDTO localOrder = orderService.buyNowOrder(buyNowRequestDTO);
+    	
+    	OrderResponse orderResponse = paymentService.createOrder(localOrder.getId());
+    	
+    	orderResponse.setKeyId(keyId);    
+    	
+    	log.info("Buy Now Razorpay Order ID: {}", orderResponse.getRazorPayOrderId());
+        return orderResponse;
+    }
+    
 }
