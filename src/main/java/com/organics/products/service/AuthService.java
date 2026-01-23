@@ -15,6 +15,9 @@ import com.organics.products.respository.RefreshTokenRepository;
 import com.organics.products.respository.UserRepository;
 import jakarta.transaction.Transactional;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -367,18 +370,19 @@ public class AuthService {
         adminRepository.save(admin);
     }
 
-    public List<AdminResponseDTO> getAllAdmins() {
+    public Page<AdminResponseDTO> getAllAdmins(int page, int size) {
 
-        List<Admin> admins = adminRepository.findAll();
+        Pageable pageable = PageRequest.of(page, size);
 
-        return admins.stream()
-                .map(admin -> {
-                    AdminResponseDTO dto = new AdminResponseDTO();
-                    dto.setId(admin.getId());
-                    dto.setEmail(admin.getEmail());
-                    dto.setPhoneNumber(admin.getPhoneNumber());
-                    return dto;
-                })
-                .collect(Collectors.toList());
+        Page<Admin> adminPage = adminRepository.findAll(pageable);
+
+        return adminPage.map(admin -> {
+            AdminResponseDTO dto = new AdminResponseDTO();
+            dto.setId(admin.getId());
+            dto.setEmail(admin.getEmail());
+            dto.setPhoneNumber(admin.getPhoneNumber());
+            return dto;
+        });
     }
+
 }

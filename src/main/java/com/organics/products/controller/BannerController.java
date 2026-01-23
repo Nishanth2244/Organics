@@ -4,6 +4,7 @@ import com.organics.products.dto.BannerCreateRequest;
 import com.organics.products.dto.BannerResponse;
 import com.organics.products.service.BannerService;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -36,8 +37,9 @@ public class BannerController {
     }
 
     @GetMapping
-    public List<BannerResponse> getAll() {
-        return bannerService.getAllBanners();
+    public Page<BannerResponse> getAll(@RequestParam(defaultValue = "0") int page,
+                                       @RequestParam(defaultValue = "10") int size) {
+        return bannerService.getAllBanners(page,size);
     }
 
     @DeleteMapping("/{id}")

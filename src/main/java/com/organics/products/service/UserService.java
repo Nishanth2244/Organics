@@ -176,4 +176,11 @@ public class UserService {
 
         return dto;
     }
+
+    public void updateFcmToken(Long userId, String token) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+        user.setFcmToken(token);
+        userRepository.save(user);
+    }
 }

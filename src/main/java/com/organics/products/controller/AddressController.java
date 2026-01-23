@@ -4,6 +4,7 @@ import com.organics.products.dto.AddressResponse;
 import com.organics.products.dto.SaveAddressRequest;
 import com.organics.products.service.AddressService;
 import jakarta.validation.Valid;
+import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -28,8 +29,11 @@ public class AddressController {
     }
 
     @GetMapping
-    public ResponseEntity<List<AddressResponse>> getMyAddresses() {
-        return ResponseEntity.ok(addressService.getMyAddresses());
+    public ResponseEntity<Page<AddressResponse>> getMyAddresses(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size
+    ) {
+        return ResponseEntity.ok(addressService.getMyAddresses(page,size));
     }
 
     @PutMapping("/{addressId}")

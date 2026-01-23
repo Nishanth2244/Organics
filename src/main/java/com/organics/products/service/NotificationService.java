@@ -23,7 +23,6 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Set;
-
 @Service
 @Slf4j
 public class NotificationService {
@@ -37,7 +36,6 @@ public class NotificationService {
     @Autowired
     private NotificationProducer producer;
 
-    // SYSTEM / ADMIN
     public void sendNotification(String receiver,
                                  String message,
                                  String sender,
@@ -81,7 +79,10 @@ public class NotificationService {
                 notification.getId(), notification.getReceiver());
     }
 
-    @Cacheable(value = "unreadNotifications", key = "#receiver")
+    @Cacheable(
+            value = "unreadNotifications",
+            key = "#receiver + '_' + #page + '_' + #size"
+    )
     @Transactional
     public List<Notification> getUnreadNotifications(String receiver,
                                                      Integer page,
@@ -138,7 +139,10 @@ public class NotificationService {
         return true;
     }
 
-    @Cacheable(value = "getAllNotifications", key = "#receiver + #page + #size")
+    @Cacheable(
+            value = "getAllNotifications",
+            key = "#receiver + '_' + #page + '_' + #size"
+    )
     @Transactional
     public List<Notification> getAllNotifications(String receiver,
                                                   Integer page,
@@ -183,14 +187,14 @@ public class NotificationService {
     public void evictCache(String receiver) {
 
         Set<String> keys =
-                redisTemplate.keys("getAllNotifications::" + receiver + "*");
+                redisTemplate.keys("getAllNotifications::" + receiver + "_*");
 
         if (keys != null && !keys.isEmpty()) {
             redisTemplate.delete(keys);
         }
 
         keys =
-                redisTemplate.keys("unreadNotifications::" + receiver + "*");
+                redisTemplate.keys("unreadNotifications::" + receiver + "_*");
 
         if (keys != null && !keys.isEmpty()) {
             redisTemplate.delete(keys);
@@ -210,7 +214,6 @@ public class NotificationService {
         return repository.findByDeletedTrue();
     }
 
-    // 🔐 Ownership Guard
     private void enforceOwnership(String receiver) {
 
         String currentUser = SecurityUtil.getCurrentUserId()
@@ -221,4 +224,12 @@ public class NotificationService {
             throw new RuntimeException("Forbidden");
         }
     }
+    @Transactional
+    public long getAllCount(String receiver) {
+
+        enforceOwnership(receiver);
+
+        return repository.countNonChatByReceiver(receiver);
+    }
+
 }

@@ -8,8 +8,13 @@ import com.organics.products.exception.ResourceNotFoundException;
 import com.organics.products.respository.BannerRepository;
 import com.organics.products.respository.UserRepository;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
@@ -108,23 +113,24 @@ public class BannerService {
 
 
     @Transactional(readOnly = true)
-    public List<BannerResponse> getAllBanners() {
+    public Page<BannerResponse> getAllBanners(int page, int size) {
 
-        log.info("Fetching all banners");
+        log.info("Fetching all banners: page={}, size={}", page, size);
 
-        List<Banner> banners = bannerRepository.findAll();
+        Pageable pageable = PageRequest.of(page, size, Sort.by("id").descending());
 
-        if (banners == null || banners.isEmpty()) {
+        Page<Banner> bannersPage = bannerRepository.findAll(pageable);
+
+        if (bannersPage.isEmpty()) {
             log.info("No banners found");
-            return List.of();
+            return Page.empty(pageable);
         }
 
-        log.info("Found {} banners", banners.size());
+        log.info("Found {} banners", bannersPage.getTotalElements());
 
-        return banners.stream()
-                .map(this::mapToResponse)
-                .toList();
+        return bannersPage.map(this::mapToResponse);
     }
+
 
 
     public void deleteBanner(Long id) {

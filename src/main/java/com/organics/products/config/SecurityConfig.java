@@ -49,7 +49,8 @@ public class SecurityConfig {
                                 "/api/category/Active",
                                 "/swagger-ui/**",
                                 "/v3/api-docs/**",
-                                "/favicon.ico"
+                                "/favicon.ico",
+                                "/api/user/fcm-token"
                         ).permitAll()
                         .requestMatchers("/api/notification/**").authenticated()
 

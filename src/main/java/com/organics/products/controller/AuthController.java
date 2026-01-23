@@ -7,6 +7,7 @@ import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -186,9 +187,10 @@ public class AuthController {
 
     @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/admin/all")
-    public ResponseEntity<?> getAllAdmins() {
+    public ResponseEntity<Page<?>> getAllAdmins(@RequestParam(defaultValue = "0") int page,
+                                                @RequestParam(defaultValue = "10") int size ) {
 
-        return ResponseEntity.ok(authService.getAllAdmins());
+        return ResponseEntity.ok(authService.getAllAdmins(page,size));
     }
 
 }

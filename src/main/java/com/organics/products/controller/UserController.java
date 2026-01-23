@@ -1,9 +1,11 @@
 package com.organics.products.controller;
 
+import com.organics.products.config.SecurityUtil;
 import com.organics.products.dto.UserDTO;
 import com.organics.products.dto.UserDisplayNameRequest;
 import com.organics.products.dto.UserProfileResponse;
 import com.organics.products.service.UserService;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -41,5 +43,13 @@ public class UserController {
     }
 
 
+    @PostMapping("/fcm-token")
+    public ResponseEntity<String> updateFcmToken(@RequestParam String token) {
+        Long userId = SecurityUtil.getCurrentUserId()
+                .orElseThrow(() -> new RuntimeException("Unauthorized"));
+
+        userService.updateFcmToken(userId, token);
+        return ResponseEntity.ok("FCM Token updated successfully");
+    }
 
 }

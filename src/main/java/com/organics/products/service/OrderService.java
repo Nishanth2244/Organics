@@ -39,6 +39,10 @@ public class OrderService {
     private OrderRepository orderRepository;
 
     @Autowired
+    private NotificationService notificationService;
+
+
+    @Autowired
     private OrderItemsRepository orderItemsRepository;
 
     @Autowired

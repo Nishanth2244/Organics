@@ -46,6 +46,8 @@ public class User {
     private String gender;
     private LocalDate dateOfBirth;
     private Integer age;
+    @Column(name = "fcm_token")
+    private String fcmToken;
 
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Address> addresses = new ArrayList<>();

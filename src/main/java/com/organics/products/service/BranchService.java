@@ -5,9 +5,13 @@ import com.organics.products.dto.BranchResponse;
 import com.organics.products.entity.Branch;
 import com.organics.products.exception.ResourceNotFoundException;
 import com.organics.products.respository.BranchRepository;
-import jakarta.transaction.Transactional;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -50,23 +54,25 @@ public class BranchService {
     }
 
 
-    public List<BranchResponse> getAllBranches() {
+    public Page<BranchResponse> getAllBranches(int page, int size) {
 
-        log.info("Fetching all branches");
+        log.info("Fetching all branches: page={}, size={}", page, size);
 
-        List<Branch> branches = branchRepository.findAll();
+        Pageable pageable = PageRequest.of(page, size, Sort.by("id").descending());
 
-        if (branches == null || branches.isEmpty()) {
+        Page<Branch> branchesPage = branchRepository.findAll(pageable);
+
+        if (branchesPage.isEmpty()) {
             log.info("No branches found");
-            return List.of();
+            return Page.empty(pageable);
         }
 
-        log.info("Found {} branches", branches.size());
+        log.info("Found {} branches", branchesPage.getTotalElements());
 
-        return branches.stream()
-                .map(this::mapToResponse)
-                .toList();
+        return branchesPage.map(this::mapToResponse);
     }
+
+
 
 
     public void updateBranchStatus(Long branchId, Boolean active) {

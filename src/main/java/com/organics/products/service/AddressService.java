@@ -11,6 +11,10 @@ import com.organics.products.respository.AddressRepository;
 import com.organics.products.respository.UserRepository;
 import jakarta.transaction.Transactional;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -87,7 +91,7 @@ public class AddressService {
     }
 
 
-    public List<AddressResponse> getMyAddresses() {
+    public Page<AddressResponse> getMyAddresses(int page,int size) {
 
         Long userId = SecurityUtil.getCurrentUserId()
                 .orElseThrow(() -> {
@@ -97,23 +101,23 @@ public class AddressService {
 
         log.info("Fetching addresses for userId={}", userId);
 
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> {
-                    log.warn("User not found for userId={}", userId);
-                    return new ResourceNotFoundException("User not found with id: " + userId);
-                });
+//        User user = userRepository.findById(userId)
+//                .orElseThrow(() -> {
+//                    log.warn("User not found for userId={}", userId);
+//                    return new ResourceNotFoundException("User not found with id: " + userId);
+//                });
+        Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
 
-        if (user.getAddresses() == null || user.getAddresses().isEmpty()) {
+        Page<Address> addressPage =
+                addressRepository.findByUserId(userId, pageable);
+
+        if (addressPage.isEmpty()) {
             log.info("No addresses found for userId={}", userId);
-            return List.of();
+        } else {
+            log.info("Found {} addresses for userId={}", addressPage.getTotalElements(), userId);
         }
 
-        log.info("Found {} addresses for userId={}", user.getAddresses().size(), userId);
-
-        return user.getAddresses()
-                .stream()
-                .map(this::mapToResponse)
-                .toList();
+        return addressPage.map(this::mapToResponse);
     }
 
 

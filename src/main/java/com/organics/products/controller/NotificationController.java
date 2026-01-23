@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/notification")
@@ -47,10 +48,10 @@ public class NotificationController {
                 notification.getEntityType(),
                 notification.getEntityId()
         );
+
         return ResponseEntity.ok("Notification sent");
     }
 
-    // ADMIN / SYSTEM ONLY
     @PostMapping("/sendList")
     public ResponseEntity<String> sendNotificationList(@RequestBody List<Notification> notifications) {
 
@@ -78,9 +79,8 @@ public class NotificationController {
         return ResponseEntity.ok("Notifications sent");
     }
 
-    // 🔁 DTO APPLIED
     @GetMapping("/unread")
-    public ResponseEntity<List<NotificationDTO>> getUnread(
+    public ResponseEntity<Map<String, Object>> getUnread(
             @RequestParam(defaultValue = "0") Integer page,
             @RequestParam(defaultValue = "10") Integer size) {
 
@@ -88,16 +88,60 @@ public class NotificationController {
                 .map(String::valueOf)
                 .orElseThrow(() -> new RuntimeException("Unauthorized"));
 
-        return ResponseEntity.ok(
-                notificationService.getUnreadNotifications(userId, page, size)
-                        .stream()
-                        .map(this::toDTO)
-                        .toList()
+        List<Notification> notifications =
+                notificationService.getUnreadNotifications(userId, page, size);
+
+        long totalCount =
+                notificationService.getUnreadCount(userId);
+
+        int totalPages =
+                (int) Math.ceil((double) totalCount / size);
+
+        Map<String, Object> response = Map.of(
+                "content", notifications.stream().map(this::toDTO).toList(),
+                "page", page,
+                "size", size,
+                "totalElements", totalCount,
+                "totalPages", totalPages,
+                "last", page >= totalPages - 1
         );
+
+        return ResponseEntity.ok(response);
     }
 
-    @PutMapping("/stared/{messageId}")
-    public String stared(@PathVariable Long messageId) {
+    @GetMapping("/all")
+    public ResponseEntity<Map<String, Object>> getAll(
+            @RequestParam(defaultValue = "0") Integer page,
+            @RequestParam(defaultValue = "10") Integer size) {
+
+        String userId = SecurityUtil.getCurrentUserId()
+                .map(String::valueOf)
+                .orElseThrow(() -> new RuntimeException("Unauthorized"));
+
+        List<Notification> notifications =
+                notificationService.getAllNotifications(userId, page, size);
+
+        // 🔁 Add this method if you want exact total count
+        long totalCount =
+                notificationService.getAllCount(userId);
+
+        int totalPages =
+                (int) Math.ceil((double) totalCount / size);
+
+        Map<String, Object> response = Map.of(
+                "content", notifications.stream().map(this::toDTO).toList(),
+                "page", page,
+                "size", size,
+                "totalElements", totalCount,
+                "totalPages", totalPages,
+                "last", page >= totalPages - 1
+        );
+
+        return ResponseEntity.ok(response);
+    }
+
+    @PutMapping("/star/{messageId}")
+    public String star(@PathVariable Long messageId) {
 
         String userId = SecurityUtil.getCurrentUserId()
                 .map(String::valueOf)
@@ -107,7 +151,7 @@ public class NotificationController {
         return "done";
     }
 
-    @PutMapping("/unStar/{messageId}")
+    @PutMapping("/unstar/{messageId}")
     public String unStar(@PathVariable Long messageId) {
 
         String userId = SecurityUtil.getCurrentUserId()
@@ -127,23 +171,6 @@ public class NotificationController {
 
         notificationService.deleteMessage(messageId, userId);
         return "done";
-    }
-
-    @GetMapping("/all")
-    public ResponseEntity<List<NotificationDTO>> getAll(
-            @RequestParam(defaultValue = "0") Integer page,
-            @RequestParam(defaultValue = "10") Integer size) {
-
-        String userId = SecurityUtil.getCurrentUserId()
-                .map(String::valueOf)
-                .orElseThrow(() -> new RuntimeException("Unauthorized"));
-
-        return ResponseEntity.ok(
-                notificationService.getAllNotifications(userId, page, size)
-                        .stream()
-                        .map(this::toDTO)
-                        .toList()
-        );
     }
 
     @PostMapping("/read/{id}")
@@ -198,11 +225,9 @@ public class NotificationController {
 
         pushService.unSubscribe(userId);
 
-        return ResponseEntity.noContent().build(); // 👈 IMPORTANT
+        return ResponseEntity.noContent().build();
     }
 
-
-    // ADMIN / DEBUG ONLY
     @GetMapping("/deletedMessages")
     public List<Notification> getDeletedNotifications() {
 
@@ -212,8 +237,6 @@ public class NotificationController {
 
         return notificationService.deletedMessage();
     }
-
-
 
     private NotificationDTO toDTO(Notification n) {
         return new NotificationDTO(
