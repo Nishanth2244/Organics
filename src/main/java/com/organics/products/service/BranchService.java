@@ -117,22 +117,23 @@ public class BranchService {
     }
 
 
-    public List<BranchResponse> getBranchesByStatus(Boolean active) {
+    public Page<BranchResponse> getBranchesByStatus(int page,int size,Boolean active) {
 
-        log.info("Fetching branches by status. active={}", active);
+        log.info("Fetching branches by status. active={}, page={}, size={}", active, page, size);
 
-        List<Branch> branches = branchRepository.findByActive(active);
+        Pageable pageable = PageRequest.of(page, size, Sort.by("id").descending());
+        Page<Branch> branches = branchRepository.findByActive(active,pageable);
 
-        if (branches == null || branches.isEmpty()) {
+
+        if (branches.isEmpty()) {
             log.info("No branches found with active={}", active);
-            return List.of();
+            return Page.empty(pageable);
         }
 
-        log.info("Found {} branches with active={}", branches.size(), active);
+        log.info("Found {} branches with active={}", branches.getTotalElements(), active);
 
-        return branches.stream()
-                .map(this::mapToResponse)
-                .toList();
+        return branches.map(this::mapToResponse);
+
     }
 
 

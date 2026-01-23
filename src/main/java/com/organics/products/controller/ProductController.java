@@ -5,6 +5,7 @@ import java.math.BigDecimal;
 import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -63,9 +64,10 @@ public class ProductController {
 
 
 	@GetMapping("/activeProd")
-	public List<ProductDTO> getActive() {
+	public Page<ProductDTO> getActive( @RequestParam(defaultValue = "0") int page,
+									   @RequestParam(defaultValue = "10") int size) {
 
-		List<ProductDTO> products = productService.activeProd();
+		Page<ProductDTO> products = productService.activeProd(page,size);
 
 		log.info("Fetching active products");
 		return products;
@@ -74,9 +76,10 @@ public class ProductController {
 
 
 	@GetMapping("/inActive")
-	public List<ProductDTO> getInActive(){
+	public Page<ProductDTO> getInActive(@RequestParam(defaultValue = "0") int page,
+										@RequestParam(defaultValue = "10") int size) {
 
-		List<ProductDTO> products = productService.getInActive();
+		Page<ProductDTO> products = productService.getInActive(page,size);
 		return products;
 	}
 
@@ -107,9 +110,13 @@ public class ProductController {
 		return products;
 	}
 	@GetMapping("/search")
-	public List<ProductDTO> search(@RequestParam String name){
-		List<ProductDTO> products = productService.searchByName(name);
-		log.info("searching by name {}", name);
-		return products;
+	public Page<ProductDTO> search(@RequestParam String name,
+								   @RequestParam(defaultValue = "0") int page,
+								   @RequestParam(defaultValue = "10") int size) {
+
+		log.info("Searching by name {}", name);
+
+		return productService.searchByName(name, page, size);
 	}
+
 }

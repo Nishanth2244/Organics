@@ -2,7 +2,6 @@ package com.organics.products.config;
 
 import com.organics.products.EventListner.EventListener;
 import com.organics.products.entity.Notification;
-import com.organics.products.service.NotificationPushService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
@@ -39,13 +38,11 @@ public class RedisConfig {
         this.redisProperties = redisProperties;
     }
 
-    // 🔥 AUTO: Sentinel OR Standalone
     @Bean
     public LettuceConnectionFactory redisConnectionFactory() {
 
         RedisProperties.Sentinel sentinel = redisProperties.getSentinel();
 
-        // ---------- SENTINEL MODE (future) ----------
         if (sentinel != null &&
                 sentinel.getMaster() != null &&
                 sentinel.getNodes() != null &&
@@ -74,7 +71,6 @@ public class RedisConfig {
             return new LettuceConnectionFactory(sentinelConfig);
         }
 
-        // ---------- STANDALONE MODE (localhost) ----------
         RedisStandaloneConfiguration redisConfig =
                 new RedisStandaloneConfiguration();
 
@@ -142,16 +138,10 @@ public class RedisConfig {
         return template;
     }
 
-    @Bean
-    public EventListener eventListener(
-            ObjectMapper objectMapper,
-            NotificationPushService notificationPushService) {
-
-        return new EventListener(objectMapper, notificationPushService);
-    }
 
     @Bean
     public MessageListenerAdapter messageListener(EventListener eventListener) {
+        // Spring automatically injects the @Component EventListener here
         return new MessageListenerAdapter(eventListener);
     }
 

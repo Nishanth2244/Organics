@@ -3,9 +3,11 @@ package com.organics.products.controller;
 
 import java.io.IOException;
 import java.lang.invoke.CallSite;
+import java.time.LocalDate;
 import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CrossOrigin;
@@ -51,12 +53,10 @@ public class CategoryController {
 
 
 	@GetMapping("/Active")
-	public List<CategoryDTO> getActive(){
-
-		List<CategoryDTO> categories = categoryService.getActive();
+	public ResponseEntity<Page<CategoryDTO>> getActive(@RequestParam(defaultValue = "0")int page,@RequestParam(defaultValue = "10")int size){
 
 		log.info("Fetching Active categories");
-		return categories;
+		return ResponseEntity.ok(categoryService.getActive(page, size));
 	}
 
 
@@ -86,21 +86,27 @@ public class CategoryController {
 
 
 	@GetMapping("/inActive")
-	public List<CategoryDTO> getInActive(){
+	public ResponseEntity<Page<CategoryDTO>> getInActive(
+			@RequestParam(defaultValue = "0") int page,
+			@RequestParam(defaultValue = "10") int size) {
 
-		List<CategoryDTO> categories = categoryService.getInActive();
-		return categories;
+		log.info("Fetching inactive categories");
+		return ResponseEntity.ok(categoryService.getInActive(page, size));
 	}
-	
+
 	@GetMapping("/admin/revenue/category-monthly")
-	public ResponseEntity<List<CategoryRevenueDTO>> getCategoryRevenueByMonth(
-	        @RequestParam int month,
-	        @RequestParam(required = false) Integer year) {
-	    
-	    int targetYear = (year != null) ? year : java.time.LocalDate.now().getYear();
-	    
-	    List<CategoryRevenueDTO> revenueData = categoryService.getCategoryRevenueByMonth(month, targetYear);
-	    return ResponseEntity.ok(revenueData);
+	public ResponseEntity<Page<CategoryRevenueDTO>> getCategoryRevenueByMonth(
+			@RequestParam(defaultValue = "0") int page,
+			@RequestParam(defaultValue = "10") int size,
+			@RequestParam int month,
+			@RequestParam(required = false) Integer year) {
+
+		int targetYear = (year != null) ? year : LocalDate.now().getYear();
+
+		return ResponseEntity.ok(
+				categoryService.getCategoryRevenueByMonth(page, size, month, targetYear)
+		);
 	}
+
 
 }

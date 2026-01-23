@@ -6,6 +6,7 @@ import com.organics.products.service.OrderService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Page;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -32,8 +33,8 @@ public class OrderController {
     }
 
     @GetMapping("/my-orders")
-    public ResponseEntity<List<OrderDTO>> getUserOrders() {
-        List<OrderDTO> orders = orderService.getUserOrders();
+    public ResponseEntity<Page<OrderDTO>> getUserOrders(@RequestParam(defaultValue = "0")int page,@RequestParam(defaultValue = "10")int size) {
+        Page<OrderDTO> orders = orderService.getUserOrders(page,size);
         return ResponseEntity.ok(orders);
     }
 
@@ -76,8 +77,8 @@ public class OrderController {
     }
 
     @GetMapping("/admin/all")
-    public ResponseEntity<List<OrderDTO>> getAllOrders() {
-        List<OrderDTO> orders = orderService.getAllOrders();
+    public ResponseEntity<Page<OrderDTO>> getAllOrders(@RequestParam(defaultValue = "0")int page,@RequestParam(defaultValue = "10")int size) {
+        Page<OrderDTO> orders = orderService.getAllOrders(page,size);
         return ResponseEntity.ok(orders);
     }
 

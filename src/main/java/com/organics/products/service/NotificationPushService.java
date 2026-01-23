@@ -14,13 +14,11 @@ import java.util.concurrent.ConcurrentHashMap;
 @Slf4j
 public class NotificationPushService {
 
-    // Store active connections: Map<UserId, List<Emitters>>
     private final Map<String, List<SseEmitter>> emitters = new ConcurrentHashMap<>();
 
     @Autowired
     private NotificationRepository repository;
 
-    // Check if a user has active connections
     public boolean isOnline(String userId) {
         // FIXED: Removed SecurityUtil check.
         // We trust the Controller to provide the correct userId.

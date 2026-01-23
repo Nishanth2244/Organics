@@ -1,5 +1,6 @@
 package com.organics.products.service;
 
+import com.organics.products.dto.DiscountDTO;
 import com.organics.products.dto.DiscountRequestDTO;
 import com.organics.products.entity.*;
 import com.organics.products.exception.BadRequestException;
@@ -7,6 +8,10 @@ import com.organics.products.exception.DiscountException;
 import com.organics.products.exception.DiscountNotFoundException;
 import com.organics.products.respository.*;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,44 +29,31 @@ public class DiscountService {
     private final CartDiscountRepository cartDiscountRepository;
     private final ProductRepo productRepo;
     private final CategoryRepo categoryRepo;
+    private final CartRepository cartRepository;
 
     public DiscountService(DiscountRepository discountRepository,
                            ProductDiscountRepository productDiscountRepository,
                            CategoryDiscountRepository categoryDiscountRepository,
                            CartDiscountRepository cartDiscountRepository,
                            ProductRepo productRepo,
-                           CategoryRepo categoryRepo) {
+                           CategoryRepo categoryRepo,
+                           CartRepository cartRepository) {
         this.discountRepository = discountRepository;
         this.productDiscountRepository = productDiscountRepository;
         this.categoryDiscountRepository = categoryDiscountRepository;
         this.cartDiscountRepository = cartDiscountRepository;
         this.productRepo = productRepo;
         this.categoryRepo = categoryRepo;
+        this.cartRepository = cartRepository;
     }
 
 
-    public Discount createDiscount(DiscountRequestDTO dto) {
+    public DiscountDTO createDiscount(DiscountRequestDTO dto) {
 
         log.info("Creating discount: {}", dto.getName());
 
-        if (dto.getName() == null || dto.getName().isBlank()) {
-            log.warn("Discount creation failed: name is empty");
-            throw new BadRequestException("Discount name cannot be empty");
-        }
-
-        if (dto.getDiscountValue() == null || dto.getDiscountValue() <= 0) {
-            log.warn("Invalid discount value: {}", dto.getDiscountValue());
-            throw new BadRequestException("Discount value must be greater than zero");
-        }
-
-        if (dto.getDiscountType() == null) {
-            log.warn("Discount type missing");
-            throw new BadRequestException("Discount type is required");
-        }
-
-        if (dto.getScope() == null) {
-            log.warn("Discount scope missing");
-            throw new BadRequestException("Discount scope is required");
+        if (discountRepository.existsByName(dto.getName())) {
+            throw new DiscountException("Discount name already exists");
         }
 
         Discount discount = new Discount();
@@ -72,40 +64,27 @@ public class DiscountService {
         discount.setActive(dto.getActive());
         discount.setValidFrom(dto.getValidFrom());
         discount.setValidTo(dto.getValidTo());
-        discount.setMinCartValue(dto.getMinCartValue());
 
         Discount saved = discountRepository.save(discount);
 
         log.info("Discount created successfully: id={}", saved.getId());
 
-        return saved;
+        return convertToDTO(saved);
     }
 
 
     public void assignToProduct(Long productId, Long discountId) {
 
-        log.info("Assigning discount {} to product {}", discountId, productId);
-
-        if (productDiscountRepository.existsByProductId(productId)) {
-            log.warn("Product {} already has a discount", productId);
-            throw new DiscountException("Product already has a discount");
-        }
-
         Product product = productRepo.findById(productId)
-                .orElseThrow(() -> {
-                    log.warn("Product not found: {}", productId);
-                    return new DiscountNotFoundException("Product not found: " + productId);
-                });
+                .orElseThrow(() -> new BadRequestException("Product not found: " + productId));
 
         Discount discount = discountRepository.findById(discountId)
-                .orElseThrow(() -> {
-                    log.warn("Discount not found: {}", discountId);
-                    return new DiscountNotFoundException("Discount not found: " + discountId);
-                });
+                .orElseThrow(() -> new DiscountNotFoundException("Discount not found: " + discountId));
 
-        if (discount.getScope() != DiscountScope.PRODUCT) {
-            log.warn("Discount {} is not a PRODUCT scope discount", discountId);
-            throw new DiscountException("Not a product discount");
+        validateDiscount(discount, DiscountScope.PRODUCT);
+
+        if (productDiscountRepository.existsByProductId(productId)) {
+            throw new DiscountException("Product already has a discount");
         }
 
         ProductDiscount pd = new ProductDiscount();
@@ -113,34 +92,21 @@ public class DiscountService {
         pd.setDiscount(discount);
 
         productDiscountRepository.save(pd);
-
-        log.info("Discount {} assigned to product {}", discountId, productId);
     }
+
 
     public void assignToCategory(Long categoryId, Long discountId) {
 
-        log.info("Assigning discount {} to category {}", discountId, categoryId);
-
-        if (categoryDiscountRepository.existsByCategoryId(categoryId)) {
-            log.warn("Category {} already has a discount", categoryId);
-            throw new DiscountException("Category already has discount");
-        }
-
         Category category = categoryRepo.findById(categoryId)
-                .orElseThrow(() -> {
-                    log.warn("Category not found: {}", categoryId);
-                    return new DiscountNotFoundException("Category not found: " + categoryId);
-                });
+                .orElseThrow(() -> new BadRequestException("Category not found: " + categoryId));
 
         Discount discount = discountRepository.findById(discountId)
-                .orElseThrow(() -> {
-                    log.warn("Discount not found: {}", discountId);
-                    return new DiscountNotFoundException("Discount not found: " + discountId);
-                });
+                .orElseThrow(() -> new DiscountNotFoundException("Discount not found: " + discountId));
 
-        if (discount.getScope() != DiscountScope.CATEGORY) {
-            log.warn("Discount {} is not CATEGORY scope", discountId);
-            throw new DiscountException("Not a category discount");
+        validateDiscount(discount, DiscountScope.CATEGORY);
+
+        if (categoryDiscountRepository.existsByCategoryId(categoryId)) {
+            throw new DiscountException("Category already has discount");
         }
 
         CategoryDiscount cd = new CategoryDiscount();
@@ -148,39 +114,31 @@ public class DiscountService {
         cd.setDiscount(discount);
 
         categoryDiscountRepository.save(cd);
-
-        log.info("Discount {} assigned to category {}", discountId, categoryId);
     }
+
 
     public void assignToCart(Long cartId, Long discountId) {
 
-        log.info("Assigning discount {} to cart {}", discountId, cartId);
+        if (!cartRepository.existsById(cartId)) {
+            throw new BadRequestException("Cart not found: " + cartId);
+        }
 
         Discount discount = discountRepository.findById(discountId)
-                .orElseThrow(() -> {
-                    log.warn("Discount not found: {}", discountId);
-                    return new DiscountNotFoundException("Discount not found: " + discountId);
-                });
+                .orElseThrow(() -> new DiscountNotFoundException("Discount not found: " + discountId));
 
-        if (discount.getScope() != DiscountScope.CART) {
-            log.warn("Discount {} is not CART scope", discountId);
-            throw new DiscountException("Not a cart discount");
-        }
+        validateDiscount(discount, DiscountScope.CART);
 
         CartDiscount cd = new CartDiscount();
         cd.setCartId(cartId);
         cd.setDiscount(discount);
 
         cartDiscountRepository.save(cd);
-
-        log.info("Discount {} assigned to cart {}", discountId, cartId);
     }
 
 
     public double calculateFinalPrice(Product product) {
 
         if (product == null) {
-            log.warn("Product is null while calculating final price");
             throw new BadRequestException("Product cannot be null");
         }
 
@@ -188,20 +146,56 @@ public class DiscountService {
 
         List<ProductDiscount> pd = productDiscountRepository.findByProductId(product.getId());
         if (!pd.isEmpty()) {
-            log.debug("Applying product discount for product {}", product.getId());
             return applyDiscount(pd.get(0).getDiscount(), mrp);
         }
 
         if (product.getCategory() != null) {
-            CategoryDiscount cd = categoryDiscountRepository.findByCategoryId(product.getCategory().getId());
+            CategoryDiscount cd = categoryDiscountRepository
+                    .findByCategoryId(product.getCategory().getId());
             if (cd != null) {
-                log.debug("Applying category discount for product {}", product.getId());
                 return applyDiscount(cd.getDiscount(), mrp);
             }
         }
 
         return mrp;
     }
+
+    public double applyCartDiscount(Long cartId, double cartTotal) {
+
+        CartDiscount cd = cartDiscountRepository.findByCartId(cartId);
+
+        if (cd == null) return cartTotal;
+
+        Discount discount = cd.getDiscount();
+
+        if (discount.getMinCartValue() != null &&
+                cartTotal < discount.getMinCartValue()) {
+            return cartTotal;
+        }
+
+        return applyDiscount(discount, cartTotal);
+    }
+
+    public Discount getApplicableDiscount(Product product) {
+
+        if (product == null) return null;
+
+        List<ProductDiscount> pd = productDiscountRepository.findByProductId(product.getId());
+        if (!pd.isEmpty()) {
+            return pd.get(0).getDiscount();
+        }
+
+        if (product.getCategory() != null) {
+            CategoryDiscount cd = categoryDiscountRepository
+                    .findByCategoryId(product.getCategory().getId());
+            if (cd != null) {
+                return cd.getDiscount();
+            }
+        }
+
+        return null;
+    }
+
 
     private double applyDiscount(Discount discount, double price) {
 
@@ -225,44 +219,57 @@ public class DiscountService {
         return Math.max(finalPrice, 0);
     }
 
-    public double applyCartDiscount(Long cartId, double cartTotal) {
+    private void validateDiscount(Discount discount, DiscountScope expectedScope) {
 
-        log.info("Applying cart discount for cart {}", cartId);
-
-        CartDiscount cd = cartDiscountRepository.findByCartId(cartId);
-
-        if (cd == null) {
-            log.debug("No cart discount for cart {}", cartId);
-            return cartTotal;
+        if (discount.getScope() != expectedScope) {
+            throw new DiscountException("Discount is not " + expectedScope + " scope");
         }
 
-        Discount discount = cd.getDiscount();
-
-        if (discount.getMinCartValue() != null &&
-                cartTotal < discount.getMinCartValue()) {
-            log.debug("Cart total {} less than min required {}", cartTotal, discount.getMinCartValue());
-            return cartTotal;
+        if (!Boolean.TRUE.equals(discount.getActive())) {
+            throw new DiscountException("Discount is inactive");
         }
 
-        return applyDiscount(discount, cartTotal);
+        LocalDateTime now = LocalDateTime.now();
+
+        if (discount.getValidFrom() != null && now.isBefore(discount.getValidFrom())) {
+            throw new DiscountException("Discount is not yet valid");
+        }
+
+        if (discount.getValidTo() != null && now.isAfter(discount.getValidTo())) {
+            throw new DiscountException("Discount has expired");
+        }
     }
 
-    public Discount getApplicableDiscount(Product product) {
+    private DiscountDTO convertToDTO(Discount discount) {
 
-        if (product == null) return null;
+        if (discount == null) return null;
 
-        List<ProductDiscount> pd = productDiscountRepository.findByProductId(product.getId());
-        if (!pd.isEmpty()) {
-            return pd.get(0).getDiscount();
+        DiscountDTO dto = new DiscountDTO();
+        dto.setId(discount.getId());
+        dto.setName(discount.getName());
+        dto.setDiscountType(discount.getDiscountType());
+        dto.setDiscountValue(discount.getDiscountValue());
+        dto.setScope(discount.getScope());
+        dto.setActive(discount.getActive());
+        dto.setValidFrom(discount.getValidFrom());
+        dto.setValidTo(discount.getValidTo());
+
+        return dto;
+    }
+
+    public Page<DiscountDTO> getAll(int page, int size) {
+
+        log.info("Fetching all discounts: page={}, size={}", page, size);
+
+        Pageable pageable = PageRequest.of(page, size, Sort.by("id").descending());
+
+        Page<Discount> discountsPage = discountRepository.findAll(pageable);
+
+        if (discountsPage.isEmpty()) {
+            log.warn("No discounts found");
+            return Page.empty(pageable);
         }
 
-        if (product.getCategory() != null) {
-            CategoryDiscount cd = categoryDiscountRepository.findByCategoryId(product.getCategory().getId());
-            if (cd != null) {
-                return cd.getDiscount();
-            }
-        }
-
-        return null;
+        return discountsPage.map(this::convertToDTO);
     }
 }

@@ -7,13 +7,22 @@ import lombok.Data;
 import java.time.LocalDateTime;
 
 @Data
-public class DiscountRequestDTO {
+public class DiscountDTO {
+
+    private Long id;
 
     private String name;
+
     private DiscountType discountType;
+
     private Double discountValue;
+
     private DiscountScope scope;
+
     private Boolean active;
+
     private LocalDateTime validFrom;
+
     private LocalDateTime validTo;
+
 }

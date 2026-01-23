@@ -9,6 +9,10 @@ import com.organics.products.exception.InventoryNotFoundException;
 import com.organics.products.respository.*;
 import jakarta.transaction.Transactional;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -115,21 +119,21 @@ public class InventoryService {
     }
 
 
-    public List<InventoryResponse> getInventoryByBranch(Long branchId) {
+    public Page<InventoryResponse> getInventoryByBranch( int page, int size,Long branchId) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by("id").descending());
 
         log.info("Fetching inventory for branch {}", branchId);
 
-        List<Inventory> inventories = inventoryRepository.findByBranchId(branchId);
+        Page<Inventory> inventories = inventoryRepository.findByBranchId(branchId,pageable);
 
         if (inventories.isEmpty()) {
             log.warn("No inventory found for branch {}", branchId);
-            throw new InventoryNotFoundException("No inventory found for branch: " + branchId);
+            return Page.empty(pageable);
         }
 
-        return inventories.stream()
-                .map(this::mapToResponse)
-                .toList();
-    }
+        return inventories
+                .map(this::mapToResponse);
+                }
 
     public List<InventoryResponse> getInventoryByProduct(Long productId) {
 
@@ -147,20 +151,21 @@ public class InventoryService {
                 .toList();
     }
 
-    public List<InventoryResponse> getAllInventory() {
+    public Page<InventoryResponse> getAllInventory(int page,int size) {
 
         log.info("Fetching all inventory");
+        Pageable pageable=PageRequest.of(page, size, Sort.by("id").descending());
 
-        List<Inventory> inventories = inventoryRepository.findAll();
+        Page<Inventory> inventories = inventoryRepository.findAll(pageable);
 
         if (inventories.isEmpty()) {
             log.warn("No inventory records found");
-            throw new InventoryNotFoundException("No inventory available");
+            return Page.empty(pageable);
         }
 
-        return inventories.stream()
-                .map(this::mapToResponse)
-                .collect(Collectors.toList());
+        return inventories
+                .map(this::mapToResponse);
+
     }
 
 
@@ -260,16 +265,17 @@ public class InventoryService {
     }
 
 
-    public List<InventoryTransactions> getInventoryTransactions(Long inventoryId) {
+    public Page<InventoryTransactions> getInventoryTransactions(int page,int size,Long inventoryId) {
 
         log.info("Fetching transactions for inventory {}", inventoryId);
 
-        List<InventoryTransactions> txs =
-                transactionRepository.findByInventoryIdOrderByTransactionDateDesc(inventoryId);
+        Pageable pageable= PageRequest.of(page,size);
+        Page<InventoryTransactions> txs =
+                transactionRepository.findByInventoryIdOrderByTransactionDateDesc(inventoryId,pageable);
 
         if (txs.isEmpty()) {
             log.warn("No transactions found for inventory {}", inventoryId);
-            throw new InventoryNotFoundException("No transactions found for inventory: " + inventoryId);
+            return Page.empty(pageable);
         }
 
         return txs;

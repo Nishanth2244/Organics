@@ -16,6 +16,10 @@ import com.organics.products.dto.*;
 import com.organics.products.entity.*;
 import com.organics.products.respository.*;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -311,18 +315,23 @@ public class OrderService {
     }
 
     @Transactional(readOnly = true)
-    public List<OrderDTO> getUserOrders() {
+    public Page<OrderDTO> getUserOrders(int page, int size) {
+
         Long userId = SecurityUtil.getCurrentUserId()
                 .orElseThrow(() -> new ResourceNotFoundException("User not authenticated"));
 
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found: " + userId));
 
-        List<Order> orders = orderRepository.findByUserOrderByOrderDateDesc(user);
+        Pageable pageable = PageRequest.of(page, size, Sort.by("orderDate").descending());
 
-        return orders.stream()
-                .map(this::convertToOrderDTO)
-                .collect(Collectors.toList());
+        Page<Order> orders = orderRepository.findByUserOrderByOrderDateDesc(user, pageable);
+
+        if (orders.isEmpty()) {
+            return Page.empty(pageable);
+        }
+
+        return orders.map(this::convertToOrderDTO);
     }
 
     @Transactional(readOnly = true)
@@ -341,16 +350,16 @@ public class OrderService {
     }
 
     @Transactional(readOnly = true)
-    public List<OrderDTO> getAllOrders() {
+    public Page<OrderDTO> getAllOrders(int page,int size) {
         if (!SecurityUtil.isAdmin()) {
             throw new RuntimeException("Unauthorized: Admin access required");
         }
+        Pageable pageable = PageRequest.of(page, size);
 
-        List<Order> orders = orderRepository.findAllByOrderByOrderDateDesc();
+        Page<Order> orders = orderRepository.findAllByOrderByOrderDateDesc(pageable);
 
-        return orders.stream()
-                .map(this::convertToOrderDTO)
-                .collect(Collectors.toList());
+        return orders
+                .map(this::convertToOrderDTO);
     }
 
     @Transactional(readOnly = true)

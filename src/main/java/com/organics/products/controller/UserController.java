@@ -43,12 +43,12 @@ public class UserController {
     }
 
 
-    @PostMapping("/fcm-token")
+    @PostMapping("/push-token")
     public ResponseEntity<String> updateFcmToken(@RequestParam String token) {
         Long userId = SecurityUtil.getCurrentUserId()
                 .orElseThrow(() -> new RuntimeException("Unauthorized"));
 
-        userService.updateFcmToken(userId, token);
+        userService.updatePushToken(userId, token);
         return ResponseEntity.ok("FCM Token updated successfully");
     }
 

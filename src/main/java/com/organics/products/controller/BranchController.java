@@ -56,10 +56,11 @@
 
 
         @GetMapping("/all")
-        public ResponseEntity<List<BranchResponse>> getBranchesByStatus(
+        public ResponseEntity<Page<BranchResponse>> getBranchesByStatus(
+                @RequestParam(defaultValue = "0")int  page,@RequestParam(defaultValue = "10")int size,
                 @RequestParam Boolean active
         ) {
-            return ResponseEntity.ok(branchService.getBranchesByStatus(active));
+            return ResponseEntity.ok(branchService.getBranchesByStatus(page,size,active));
         }
 
     }

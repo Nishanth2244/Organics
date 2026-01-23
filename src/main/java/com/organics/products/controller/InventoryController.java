@@ -4,6 +4,7 @@ import com.organics.products.dto.InventoryCreateRequest;
 import com.organics.products.dto.InventoryResponse;
 import com.organics.products.entity.InventoryTransactions;
 import com.organics.products.service.InventoryService;
+import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -36,11 +37,12 @@ public class InventoryController {
     }
 
     @GetMapping("/inventory/branch/{branchId}")
-    public ResponseEntity<List<InventoryResponse>> getInventoryByBranch(
+    public ResponseEntity<Page<InventoryResponse>> getInventoryByBranch(@RequestParam(defaultValue = "0") int page,
+                                                                        @RequestParam(defaultValue = "10") int size,
             @PathVariable Long branchId
     ) {
         return ResponseEntity.ok(
-                inventoryService.getInventoryByBranch(branchId)
+                inventoryService.getInventoryByBranch(page,size,branchId)
         );
     }
 
@@ -84,19 +86,20 @@ public class InventoryController {
         return ResponseEntity.noContent().build();
     }
 
-    // INVENTORY TRANSACTIONS (Audit)
     @GetMapping("/inventory/{inventoryId}/transactions")
-    public ResponseEntity<List<InventoryTransactions>> getInventoryTransactions(
+    public ResponseEntity<Page<InventoryTransactions>> getInventoryTransactions(@RequestParam(defaultValue = "0") int page,
+                                                                                @RequestParam(defaultValue = "10") int size,
             @PathVariable Long inventoryId
     ) {
         return ResponseEntity.ok(
-                inventoryService.getInventoryTransactions(inventoryId)
+                inventoryService.getInventoryTransactions(page,size,inventoryId)
         );
     }
 
     @GetMapping("/inventory")
-    public ResponseEntity<List<InventoryResponse>> getAllInventory() {
-        return ResponseEntity.ok(inventoryService.getAllInventory());
+    public ResponseEntity<Page<InventoryResponse>> getAllInventory(@RequestParam(defaultValue = "0") int page,
+                                                                   @RequestParam(defaultValue = "10") int size) {
+        return ResponseEntity.ok(inventoryService.getAllInventory(page,size));
     }
 
 }

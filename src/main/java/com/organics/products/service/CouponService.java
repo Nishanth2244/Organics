@@ -6,6 +6,10 @@ import java.util.stream.Collectors;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
 import com.organics.products.dto.CouponDTO;
@@ -15,6 +19,7 @@ import com.organics.products.entity.DiscountType;
 import com.organics.products.exception.CouponNotFoundException;
 import com.organics.products.exception.BadRequestException;
 import com.organics.products.respository.CouponRepository;
+import org.springframework.transaction.annotation.Transactional;
 
 @Slf4j
 @Service
@@ -74,37 +79,41 @@ public class CouponService {
 		return converToDTO(saved);
 	}
 
-	public List<CouponDTO> getActive() {
+	@Transactional(readOnly = true)
+	public Page<CouponDTO> getActive(int page, int size) {
 
-		log.info("Fetching active coupons");
+		log.info("Fetching active coupons: page={}, size={}", page, size);
 
-		List<Coupon> coupons = couponRepository.findByIsActiveTrue();
+		Pageable pageable = PageRequest.of(page, size, Sort.by("id").descending());
 
-		if (coupons.isEmpty()) {
+		Page<Coupon> couponsPage = couponRepository.findByIsActiveTrue(pageable);
+
+		if (couponsPage.isEmpty()) {
 			log.warn("No active coupons found");
-			throw new CouponNotFoundException("No active coupons available");
+			return Page.empty(pageable);
 		}
 
-		return coupons.stream()
-				.map(this::converToDTO)
-				.collect(Collectors.toList());
+		return couponsPage.map(this::converToDTO);
 	}
 
-	public List<CouponDTO> getInActive() {
 
-		log.info("Fetching inactive coupons");
+	@Transactional(readOnly = true)
+	public Page<CouponDTO> getInActive(int page, int size) {
 
-		List<Coupon> coupons = couponRepository.findByIsActiveFalse();
+		log.info("Fetching inactive coupons: page={}, size={}", page, size);
 
-		if (coupons.isEmpty()) {
+		Pageable pageable = PageRequest.of(page, size, Sort.by("id").descending());
+
+		Page<Coupon> couponsPage = couponRepository.findByIsActiveFalse(pageable);
+
+		if (couponsPage.isEmpty()) {
 			log.warn("No inactive coupons found");
-			throw new CouponNotFoundException("No inactive coupons available");
+			return Page.empty(pageable);
 		}
 
-		return coupons.stream()
-				.map(this::converToDTO)
-				.collect(Collectors.toList());
+		return couponsPage.map(this::converToDTO);
 	}
+
 
 	public void setStatus(Boolean status, Long id) {
 

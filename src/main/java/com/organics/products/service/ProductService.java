@@ -8,6 +8,10 @@ import java.util.stream.Collectors;
 import com.organics.products.entity.*;
 import com.organics.products.exception.ProductNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -94,6 +98,7 @@ public class ProductService {
 	}
 
 
+
 	public ProductDTO add(Long categoryId,
 						  MultipartFile[] images,
 						  String productName,
@@ -165,39 +170,37 @@ public class ProductService {
 	}
 
 
-	public List<ProductDTO> activeProd() {
+	public Page<ProductDTO> activeProd(int page, int size) {
 
 		log.info("Fetching active products");
 
-		List<Product> products = productRepo.findByStatusTrue();
+		Pageable pageable = PageRequest.of(page, size, Sort.by("id").descending());
+
+		Page<Product> products = productRepo.findByStatusTrue(pageable);
 
 		if (products.isEmpty()) {
 			log.warn("No active products found");
-			return List.of(); // production-safe empty list
+			return Page.empty(pageable);
 		}
 
-		return products.stream()
-				.map(this::convertToDTO)
-				.collect(Collectors.toList());
+		return products.map(this::convertToDTO);
 	}
 
-
-	public List<ProductDTO> getInActive() {
+	public Page<ProductDTO> getInActive(int page, int size) {
 
 		log.info("Fetching inactive products");
 
-		List<Product> products = productRepo.findByStatusFalse();
+		Pageable pageable = PageRequest.of(page, size, Sort.by("id").descending());
+
+		Page<Product> products = productRepo.findByStatusFalse(pageable);
 
 		if (products.isEmpty()) {
 			log.warn("No inactive products found");
-			return List.of();
+			return Page.empty(pageable);
 		}
 
-		return products.stream()
-				.map(this::convertToDTO)
-				.collect(Collectors.toList());
+		return products.map(this::convertToDTO);
 	}
-
 
 	public Product updateProduct(Long id,
 								 MultipartFile[] images,
@@ -268,46 +271,38 @@ public class ProductService {
 	}
 
 
+
 	public List<ProductDTO> byCategory(Long categoryId) {
-
 		log.info("Fetching products by category: {}", categoryId);
-
 		Category category = categoryRepo.findById(categoryId)
 				.orElseThrow(() -> {
 					log.warn("Category not found: {}", categoryId);
-					return new ProductNotFoundException("Category not found: " + categoryId);
-				});
-
-		List<Product> products =
-				productRepo.findByCategoryId(category.getId());
-
-		if (products.isEmpty()) {
-			log.warn("No products found in category: {}", categoryId);
+					return new ProductNotFoundException("Category not found: " + categoryId); });
+		List<Product> products = productRepo.findByCategoryId(category.getId());
+		if (products.isEmpty())
+		{ log.warn("No products found in category: {}", categoryId);
 			return List.of();
 		}
-
 		return products.stream()
 				.map(this::convertToDTO)
 				.collect(Collectors.toList());
 	}
 
 
-	public List<ProductDTO> searchByName(String name) {
+	public Page<ProductDTO> searchByName(String name, int page, int size) {
 
 		log.info("Searching products by name: {}", name);
 
-		List<Product> products =
-				productRepo.findByProductNameContainingIgnoreCaseAndStatusTrue(name);
+		Pageable pageable = PageRequest.of(page, size, Sort.by("id").descending());
+
+		Page<Product> products =
+				productRepo.findByProductNameContainingIgnoreCaseAndStatusTrue(name, pageable);
 
 		if (products.isEmpty()) {
 			log.warn("No products found for search: {}", name);
-			throw new ProductNotFoundException(
-					"Products not found with name: " + name
-			);
+			return Page.empty(pageable);
 		}
 
-		return products.stream()
-				.map(this::convertToDTO)
-				.collect(Collectors.toList());
+		return products.map(this::convertToDTO);
 	}
 }

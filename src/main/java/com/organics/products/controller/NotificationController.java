@@ -5,6 +5,7 @@ import com.organics.products.dto.NotificationDTO;
 import com.organics.products.entity.Notification;
 import com.organics.products.service.NotificationPushService;
 import com.organics.products.service.NotificationService;
+import com.organics.products.service.PushNotificationService;
 import lombok.extern.slf4j.Slf4j;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,6 +26,9 @@ public class NotificationController {
 
     @Autowired
     private NotificationPushService pushService;
+
+    @Autowired
+    private PushNotificationService pushNotificationService;
 
     // ADMIN / SYSTEM ONLY
     @PostMapping("/send")
@@ -121,7 +125,6 @@ public class NotificationController {
         List<Notification> notifications =
                 notificationService.getAllNotifications(userId, page, size);
 
-        // 🔁 Add this method if you want exact total count
         long totalCount =
                 notificationService.getAllCount(userId);
 
@@ -256,5 +259,19 @@ public class NotificationController {
                 n.getEntityType(),
                 n.getEntityId()
         );
+    }
+
+    @PostMapping("/broadcast")
+    public ResponseEntity<String> sendBroadcast(@RequestParam String title, @RequestParam String message) {
+
+        if (!SecurityUtil.hasRole("ADMIN")) {
+            throw new RuntimeException("Forbidden: ADMIN only");
+        }
+
+        log.info("Sending broadcast: {} - {}", title, message);
+
+        pushNotificationService.sendBroadcastNotification(title, message);
+
+        return ResponseEntity.ok("Broadcast process started");
     }
 }

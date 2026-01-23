@@ -4,7 +4,9 @@ import java.time.LocalDate;
 import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -36,14 +38,19 @@ public class CouponController {
     }
 
     @GetMapping("/get")
-    public List<CouponDTO> getActive() {
-        return couponService.getActive();
+    public Page<CouponDTO> getActive(  @RequestParam(defaultValue = "0") int page,
+                                       @RequestParam(defaultValue = "10") int size) {
+        return couponService.getActive(page,size);
     }
 
     @GetMapping("/getInActive")
-    public List<CouponDTO> getInActive() {
-        return couponService.getInActive();
+    public ResponseEntity<Page<CouponDTO>> getInActive(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+
+        return ResponseEntity.ok(couponService.getInActive(page, size));
     }
+
 
     @PutMapping("/status/{id}")
     public String updateStatus(@PathVariable Long id, @RequestParam Boolean status) {

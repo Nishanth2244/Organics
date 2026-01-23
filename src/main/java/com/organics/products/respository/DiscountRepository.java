@@ -8,4 +8,6 @@ import java.util.List;
 
 public interface DiscountRepository extends JpaRepository<Discount, Long> {
     List<Discount> findByActiveTrueAndValidToBefore(LocalDateTime now);
+
+    boolean existsByName(String name);
 }

@@ -5,7 +5,12 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.organics.products.config.SecurityUtil;
@@ -90,24 +95,25 @@ public class CategoryService {
 		return convertToDTO(saved);
 	}
 
+	@Transactional(readOnly = true)
+	public Page<CategoryDTO> getActive(int page, int size) {
 
-	public List<CategoryDTO> getActive() {
+		log.info("Fetching active categories: page={}, size={}", page, size);
 
-		log.info("Fetching active categories");
+		Pageable pageable = PageRequest.of(page, size, Sort.by("id").descending());
 
-		List<Category> categories = categoryRepo.findByStatusTrue();
+		Page<Category> categoriesPage = categoryRepo.findByStatusTrue(pageable);
 
-		if (categories == null || categories.isEmpty()) {
+		if (categoriesPage.isEmpty()) {
 			log.info("No active categories found");
-			return List.of();
+			return Page.empty(pageable);
 		}
 
-		log.info("Found {} active categories", categories.size());
+		log.info("Found {} active categories", categoriesPage.getTotalElements());
 
-		return categories.stream()
-				.map(this::convertToDTO)
-				.collect(Collectors.toList());
+		return categoriesPage.map(this::convertToDTO);
 	}
+
 
 
 	public Category updateCategory(Long id,
@@ -180,29 +186,35 @@ public class CategoryService {
 	}
 
 
-	public List<CategoryDTO> getInActive() {
+	@Transactional(readOnly = true)
+	public Page<CategoryDTO> getInActive(int page, int size) {
 
-		log.info("Fetching inactive categories");
+		log.info("Fetching inactive categories: page={}, size={}", page, size);
 
-		List<Category> categories = categoryRepo.findByStatusFalse();
+		Pageable pageable = PageRequest.of(page, size, Sort.by("id").descending());
 
-		if (categories == null || categories.isEmpty()) {
+		Page<Category> categoriesPage = categoryRepo.findByStatusFalse(pageable);
+
+		if (categoriesPage.isEmpty()) {
 			log.info("No inactive categories found");
-			return List.of();
+			return Page.empty(pageable);
 		}
 
-		log.info("Found {} inactive categories", categories.size());
+		log.info("Found {} inactive categories", categoriesPage.getTotalElements());
 
-		return categories.stream()
-				.map(this::convertToDTO)
-				.collect(Collectors.toList());
+		return categoriesPage.map(this::convertToDTO);
 	}
-	
-	
-	public List<CategoryRevenueDTO> getCategoryRevenueByMonth(int month, int year) {
-//	    if (!SecurityUtil.isAdmin()) {
-//	        throw new RuntimeException("Unauthorized: Admin access required");
-//	    }
-	    return orderRepository.getCategoryRevenueByMonth(month, year);
+
+
+
+	@Transactional(readOnly = true)
+	public Page<CategoryRevenueDTO> getCategoryRevenueByMonth(
+			int page, int size, int month, int year) {
+
+		Pageable pageable = PageRequest.of(page, size, Sort.by("totalRevenue").descending());
+
+		return orderRepository.getCategoryRevenueByMonth(month, year, pageable);
 	}
+
+
 }

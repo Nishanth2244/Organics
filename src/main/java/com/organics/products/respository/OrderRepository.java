@@ -4,6 +4,8 @@ import com.organics.products.dto.CategoryRevenueDTO;
 import com.organics.products.entity.Order;
 import com.organics.products.entity.OrderStatus;
 import com.organics.products.entity.User;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -16,13 +18,13 @@ import java.util.Optional;
 @Repository
 public interface OrderRepository extends JpaRepository<Order, Long> {
 
-    List<Order> findByUserOrderByOrderDateDesc(User user);
+    Page<Order> findByUserOrderByOrderDateDesc(User user,Pageable pageable);
 
     List<Order> findByUserId(Long userId);
 
     List<Order> findByOrderStatusOrderByOrderDateDesc(OrderStatus status);
 
-    List<Order> findAllByOrderByOrderDateDesc();
+    Page<Order> findAllByOrderByOrderDateDesc(Pageable pageable);
 
     List<Order> findByOrderDateOrderByOrderDateDesc(LocalDate date);
 
@@ -41,6 +43,7 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
 
     // Count queries for date range
     Long countByOrderDateBetween(LocalDate startDate, LocalDate endDate);
+
     Long countByOrderDate(LocalDate date);
 
     @Query("SELECT o.orderStatus, COUNT(o) FROM Order o WHERE o.orderDate = :date GROUP BY o.orderStatus")
@@ -58,9 +61,11 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
             "ORDER BY o.orderDate")
     List<Object[]> getDailyOrderCounts(@Param("startDate") LocalDate startDate,
                                        @Param("endDate") LocalDate endDate);
+
     @Query("SELECT COALESCE(SUM(o.orderAmount), 0) FROM Order o WHERE o.orderDate BETWEEN :startDate AND :endDate")
     Double sumOrderAmountByDateRange(@Param("startDate") LocalDate startDate,
                                      @Param("endDate") LocalDate endDate);
+
     List<Order> findByOrderDateBetweenOrderByOrderDateDesc(LocalDate startDate, LocalDate endDate);
 
     @Query("SELECT o FROM Order o LEFT JOIN FETCH o.orderItems i LEFT JOIN FETCH i.product WHERE o.id = :orderId")
@@ -74,15 +79,24 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
 
     @Query("SELECT SUM(o.orderAmount) FROM Order o WHERE o.orderStatus = :status AND o.orderDate >= :startDate")
     Double getRevenueByStatusAndDate(@Param("status") OrderStatus status, @Param("startDate") LocalDate startDate);
-    
-    @Query("SELECT new com.organics.products.dto.CategoryRevenueDTO(c.categoryName, SUM(oi.price * oi.quantity)) " +
-    	       "FROM Order o " +
-    	       "JOIN o.orderItems oi " +
-    	       "JOIN oi.product p " +
-    	       "JOIN p.category c " +
-    	       "WHERE MONTH(o.orderDate) = :month " +
-    	       "AND YEAR(o.orderDate) = :year " +
-    	       "AND o.orderStatus = 'DELIVERED' " +
-    	       "GROUP BY c.categoryName")
-    	List<CategoryRevenueDTO> getCategoryRevenueByMonth(@Param("month") int month, @Param("year") int year);
-}
+
+    @Query("""
+
+            SELECT new com.organics.products.dto.CategoryRevenueDTO(
+    c.categoryName,
+    SUM(oi.price * oi.quantity)
+)
+FROM Order o
+JOIN o.orderItems oi
+JOIN oi.product p
+JOIN p.category c
+WHERE MONTH(o.orderDate) = :month
+  AND YEAR(o.orderDate) = :year
+  AND o.orderStatus = 'DELIVERED'
+GROUP BY c.categoryName
+""")
+    Page<CategoryRevenueDTO> getCategoryRevenueByMonth(
+            @Param("month") int month,
+            @Param("year") int year,
+            Pageable pageable);
+    }
