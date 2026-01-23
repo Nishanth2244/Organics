@@ -13,6 +13,10 @@ import com.organics.products.respository.ReviewsRepository;
 import com.organics.products.respository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -156,12 +160,16 @@ public class ReviewsService {
     }
 
 
-    public List<ReviewResponseDTO> getProductReviews(Long productId) {
-        return reviewsRepository.findByProductIdAndIsEligibleTrue(productId)
-                .stream()
-                .map(this::mapToDTO)
-                .toList();
+    public Page<ReviewResponseDTO> getProductReviews(Long productId, int page, int size) {
+
+        Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
+
+        Page<Reviews> reviewsPage =
+                reviewsRepository.findByProductIdAndIsEligibleTrue(productId, pageable);
+
+        return reviewsPage.map(this::mapToDTO);
     }
+
 
 
     private ReviewResponseDTO mapToDTO(Reviews review) {

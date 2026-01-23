@@ -1,6 +1,8 @@
 package com.organics.products.respository;
 
 import com.organics.products.entity.Reviews;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -11,7 +13,7 @@ public interface ReviewsRepository extends JpaRepository<Reviews, Long> {
 
     boolean existsByUserIdAndProductId(Long userId, Long productId);
 
-    List<Reviews> findByProductIdAndIsEligibleTrue(Long productId);
+    Page<Reviews> findByProductIdAndIsEligibleTrue(Long productId, Pageable  pageable);
 
     @Query("""
     SELECT COUNT(r), COALESCE(AVG(r.rating), 0)

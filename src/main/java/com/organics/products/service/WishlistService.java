@@ -8,6 +8,9 @@ import com.organics.products.exception.ResourceNotFoundException;
 import com.organics.products.exception.UnauthorizedException;
 import com.organics.products.respository.*;
 import jakarta.transaction.Transactional;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
 import java.util.Collections;
@@ -73,7 +76,7 @@ public class WishlistService {
         return mapToProductDTO(product);
     }
 
-    public List<ProductDTO> getMyWishlist() {
+    public Page<ProductDTO> getMyWishlist(int page, int size) {
 
         Long userId = SecurityUtil.getCurrentUserId()
                 .orElseThrow(() -> new UnauthorizedException("Unauthorized"));
@@ -82,10 +85,10 @@ public class WishlistService {
                 .orElse(null);
 
         if (wishlist == null || wishlist.getWishListItems() == null || wishlist.getWishListItems().isEmpty()) {
-            return Collections.emptyList();
+            return Page.empty();
         }
 
-        return wishlist.getWishListItems()
+        List<ProductDTO> filteredProducts = wishlist.getWishListItems()
                 .stream()
                 .filter(item ->
                         Boolean.TRUE.equals(item.getProduct().getStatus()) &&
@@ -94,7 +97,20 @@ public class WishlistService {
                 )
                 .map(item -> mapToProductDTO(item.getProduct()))
                 .toList();
+
+        // 🔹 Manual pagination
+        int start = page * size;
+        int end = Math.min(start + size, filteredProducts.size());
+
+        if (start >= filteredProducts.size()) {
+            return new PageImpl<>(Collections.emptyList(), PageRequest.of(page, size), filteredProducts.size());
+        }
+
+        List<ProductDTO> pageContent = filteredProducts.subList(start, end);
+
+        return new PageImpl<>(pageContent, PageRequest.of(page, size), filteredProducts.size());
     }
+
 
     public void removeFromWishlist(Long productId) {
 

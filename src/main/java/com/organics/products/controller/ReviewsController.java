@@ -4,6 +4,7 @@ import com.organics.products.dto.RatingSummaryDTO;
 import com.organics.products.dto.ReviewResponseDTO;
 import com.organics.products.service.ReviewsService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -26,14 +27,24 @@ public class ReviewsController {
 
 
     @GetMapping("/product/{productId}")
-    public List<ReviewResponseDTO> getReviews(@PathVariable Long productId) {
-        return reviewsService.getProductReviews(productId);
+    public Page<ReviewResponseDTO> getReviews(
+            @PathVariable Long productId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size
+    ) {
+        return reviewsService.getProductReviews(productId, page, size);
     }
+
 
     @GetMapping("/summary/{productId}")
     public RatingSummaryDTO getSummary(@PathVariable Long productId) {
         return reviewsService.getRatingSummary(productId);
     }
+
+
+
+
+
 
 
 

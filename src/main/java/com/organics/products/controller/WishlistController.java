@@ -2,6 +2,7 @@ package com.organics.products.controller;
 
 import com.organics.products.dto.ProductDTO;
 import com.organics.products.service.WishlistService;
+import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -17,7 +18,6 @@ public class WishlistController {
         this.wishlistService = wishlistService;
     }
 
-    // 🔒 Same endpoint: POST /api/user/wishlist/{productId}
     @PostMapping("/{productId}")
     public ResponseEntity<ProductDTO> addToWishlist(
             @PathVariable Long productId
@@ -27,13 +27,16 @@ public class WishlistController {
         );
     }
 
-    // 🔒 Same endpoint: GET /api/user/wishlist
     @GetMapping
-    public ResponseEntity<List<ProductDTO>> getWishlist() {
+    public ResponseEntity<Page<ProductDTO>> getWishlist(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size
+    ) {
         return ResponseEntity.ok(
-                wishlistService.getMyWishlist()
+                wishlistService.getMyWishlist(page, size)
         );
     }
+
 
     // 🔒 Same endpoint: DELETE /api/user/wishlist/{productId}
     @DeleteMapping("/{productId}")
