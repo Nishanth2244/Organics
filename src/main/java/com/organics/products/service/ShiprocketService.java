@@ -335,11 +335,13 @@ public class ShiprocketService {
         String uniqueOrderId = "ORG" + order.getId() + "_" + System.currentTimeMillis();
         request.put("order_id", uniqueOrderId);
         request.put("order_date", order.getOrderDate().toString());
+
+        // Send the actual order amount (620 in your case)
         request.put("order_amount", order.getOrderAmount());
         request.put("comment", order.getDescription() != null ?
                 order.getDescription() : "Organic Products Order");
 
-        // Customer details - FIX: Ensure all required fields are present
+        // Customer details
         String firstName = user.getFirstName() != null ? user.getFirstName() : "";
         String lastName = user.getLastName() != null ? user.getLastName() : "Customer";
 
@@ -364,6 +366,8 @@ public class ShiprocketService {
         // Order items
         List<Map<String, Object>> orderItems = new ArrayList<>();
         double subTotal = 0.0;
+        double totalDiscount = 0.0;
+        double totalTax = 0.0;
 
         for (OrderItems item : order.getOrderItems()) {
             Map<String, Object> orderItem = new HashMap<>();
@@ -371,29 +375,50 @@ public class ShiprocketService {
             orderItem.put("sku", getSku(item.getProduct()));
             orderItem.put("units", item.getQuantity());
 
+            // Get prices from order item
             double price = item.getPrice() != null ? item.getPrice() : 0.0;
+            double tax = item.getTax() != null ? item.getTax() : 0.0;
+            double discount = item.getDiscount() != null ? item.getDiscount() : 0.0;
+
             orderItem.put("selling_price", price);
-            orderItem.put("discount", item.getDiscount() != null ? item.getDiscount() : 0.0);
-            orderItem.put("tax", item.getTax() != null ? item.getTax() : 0.0);
+            orderItem.put("discount", discount);
+            orderItem.put("tax", tax);
             orderItem.put("hsn", "123456");
 
             orderItems.add(orderItem);
-            subTotal += price * item.getQuantity();
+
+            // Calculate totals
+            double itemTotal = price * item.getQuantity();
+            subTotal += itemTotal;
+            totalTax += tax * item.getQuantity();
+            totalDiscount += discount * item.getQuantity();
+
+            log.info("Shiprocket Item: {} x {} @ {} = {}, Discount: {}, Tax: {}",
+                    item.getProduct().getProductName(), item.getQuantity(), price,
+                    itemTotal, discount, tax);
         }
 
         request.put("order_items", orderItems);
         request.put("sub_total", subTotal);
+        //request.put("total_discount", totalDiscount);
 
         // Payment and charges
         request.put("payment_method", "Prepaid");
         request.put("shipping_charges", 0.0);
-        request.put("total_discount", calculateTotalDiscount(order));
 
-        // Package dimensions (REQUIRED)
+        // Package dimensions
         request.put("length", 10);
         request.put("breadth", 10);
         request.put("height", 10);
         request.put("weight", 1.0);
+
+        log.info("=== Shiprocket Request ===");
+        log.info("Order Amount: {}", order.getOrderAmount());
+        log.info("Sub Total: {}", subTotal);
+        log.info("Total Discount: {}", totalDiscount);
+        log.info("Total Tax: {}", totalTax);
+        log.info("Calculated Total (sub + tax): {}", subTotal );
+        log.info("==========================");
 
         return request;
     }
