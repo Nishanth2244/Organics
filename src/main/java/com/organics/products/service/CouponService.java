@@ -121,21 +121,25 @@ public class CouponService {
 
 
 	@Transactional(readOnly = true)
-	public Page<CouponDTO> getInActive(int page, int size) {
+	public List<CouponDTO> getInActive() {
 
-		log.info("Fetching inactive coupons: page={}, size={}", page, size);
+		log.info("Fetching inactive coupons");
 
-		Pageable pageable = PageRequest.of(page, size, Sort.by("id").descending());
+		List<Coupon> coupons =
+				couponRepository.findByIsActiveFalse();
 
-		Page<Coupon> couponsPage = couponRepository.findByIsActiveFalse(pageable);
-
-		if (couponsPage.isEmpty()) {
+		if (coupons == null || coupons.isEmpty()) {
 			log.warn("No inactive coupons found");
-			return Page.empty(pageable);
+			return List.of(); // safe empty list
 		}
 
-		return couponsPage.map(this::converToDTO);
+		log.info("Found {} inactive coupons", coupons.size());
+
+		return coupons.stream()
+				.map(this::converToDTO)
+				.toList();
 	}
+
 
 
 	public void setStatus(Boolean status, Long id) {

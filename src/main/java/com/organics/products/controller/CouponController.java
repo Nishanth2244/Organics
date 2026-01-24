@@ -45,12 +45,12 @@ public class CouponController {
 
 
     @GetMapping("/getInActive")
-    public ResponseEntity<Page<CouponDTO>> getInActive(
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) {
+    public ResponseEntity<List<CouponDTO>> getInActive() {
 
-        return ResponseEntity.ok(couponService.getInActive(page, size));
+        List<CouponDTO> coupons = couponService.getInActive();
+        return ResponseEntity.ok(coupons);
     }
+
 
 
     @PutMapping("/status/{id}")

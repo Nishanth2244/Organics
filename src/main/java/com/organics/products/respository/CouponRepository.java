@@ -16,7 +16,7 @@ public interface CouponRepository extends JpaRepository<Coupon, Long> {
 
 	List<Coupon> findByIsActiveTrue( );
 
-	Page<Coupon> findByIsActiveFalse(Pageable  pageable);
+	List<Coupon> findByIsActiveFalse();
 
 	Coupon findByCode(String couponCode);
 }
