@@ -30,7 +30,6 @@ public class NotificationController {
     @Autowired
     private PushNotificationService pushNotificationService;
 
-    // ADMIN / SYSTEM ONLY
     @PostMapping("/send")
     public ResponseEntity<String> sendNotification(@RequestBody Notification notification) {
 

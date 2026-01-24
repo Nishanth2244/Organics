@@ -38,10 +38,11 @@ public class CouponController {
     }
 
     @GetMapping("/get")
-    public Page<CouponDTO> getActive(  @RequestParam(defaultValue = "0") int page,
-                                       @RequestParam(defaultValue = "10") int size) {
-        return couponService.getActive(page,size);
+    public List<CouponDTO> getActive() {
+
+        return couponService.getActive();
     }
+
 
     @GetMapping("/getInActive")
     public ResponseEntity<Page<CouponDTO>> getInActive(
@@ -67,15 +68,23 @@ public class CouponController {
             @RequestParam(required = false) DiscountType discountType,
             @RequestParam(required = false) Double discountValue,
             @RequestParam(required = false) Double minOrderAmt,
-            @RequestParam(required = false) Double maxDiscountAm,
+            @RequestParam(required = false) Double maxDiscountAmt,
             @RequestParam(required = false) Integer usageLimit,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
 
-        couponService.updateExtended(id, code, description, discountType, discountValue, 
-                                     minOrderAmt, maxDiscountAm, usageLimit, startDate, endDate);
+            @RequestParam(name = "startDate", required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+            LocalDate startDate,
 
-        log.info("Coupon ID: {} updated with new attributes", id);
+            @RequestParam(name = "endDate", required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+            LocalDate endDate) {
+
+        log.info("Received update request: startDate={}, endDate={}", startDate, endDate);
+
+        couponService.updateExtended(id, code, description, discountType, discountValue,
+                minOrderAmt, maxDiscountAmt, usageLimit, startDate, endDate);
+
         return "Coupon Updated successfully";
     }
+
 }

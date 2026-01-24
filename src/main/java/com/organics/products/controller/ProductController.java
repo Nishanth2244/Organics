@@ -7,6 +7,7 @@ import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
@@ -104,11 +105,15 @@ public class ProductController {
 
 
 	@GetMapping("/byCategory")
-	public List<ProductDTO> byCategory(@RequestParam Long categoryId){
+	public ResponseEntity<Page<ProductDTO>> byCategory(
+			@RequestParam Long categoryId,
+			@RequestParam(defaultValue = "0") int page,
+			@RequestParam(defaultValue = "10") int size) {
 
-		List<ProductDTO> products = productService.byCategory(categoryId);
-		return products;
+		Page<ProductDTO> products = productService.byCategory(categoryId, page, size);
+		return ResponseEntity.ok(products);
 	}
+
 	@GetMapping("/search")
 	public Page<ProductDTO> search(@RequestParam String name,
 								   @RequestParam(defaultValue = "0") int page,

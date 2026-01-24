@@ -4,6 +4,7 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import com.organics.products.entity.EntityType;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -27,6 +28,8 @@ public class CouponService {
 
 	@Autowired
 	private CouponRepository couponRepository;
+	@Autowired
+	private NotificationService notificationService;
 
 	public CouponDTO converToDTO(Coupon coupon) {
 		CouponDTO dto = new CouponDTO();
@@ -75,26 +78,46 @@ public class CouponService {
 		Coupon saved = couponRepository.save(coupon);
 
 		log.info("Coupon created successfully with id={}", saved.getId());
+		try {
+			notificationService.sendNotification(
+					"ALL", // Receiver: "ALL" implies a broadcast (logic depends on your frontend handling)
+					"New Coupon Available: " + saved.getCode() + " - " + saved.getDescription(),
+					"ADMIN",
+					"COUPON_ALERT",
+					"/coupons",
+					"Promotions",
+					"General",
+					"New Coupon Added!",
+					EntityType.COUPON,
+					saved.getId()
+			);
+		} catch (Exception e) {
+			log.error("Failed to send coupon notification", e);
+		}
 
 		return converToDTO(saved);
+
 	}
 
 	@Transactional(readOnly = true)
-	public Page<CouponDTO> getActive(int page, int size) {
+	public List<CouponDTO> getActive() {
 
-		log.info("Fetching active coupons: page={}, size={}", page, size);
+		log.info("Fetching active coupons");
 
-		Pageable pageable = PageRequest.of(page, size, Sort.by("id").descending());
+		List<Coupon> coupons = couponRepository.findByIsActiveTrue();
 
-		Page<Coupon> couponsPage = couponRepository.findByIsActiveTrue(pageable);
-
-		if (couponsPage.isEmpty()) {
+		if (coupons == null || coupons.isEmpty()) {
 			log.warn("No active coupons found");
-			return Page.empty(pageable);
+			return List.of();
 		}
 
-		return couponsPage.map(this::converToDTO);
+		log.info("Found {} active coupons", coupons.size());
+
+		return coupons.stream()
+				.map(this::converToDTO)
+				.toList();
 	}
+
 
 
 	@Transactional(readOnly = true)

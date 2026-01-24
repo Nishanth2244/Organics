@@ -4,13 +4,12 @@ import com.organics.products.config.SecurityUtil;
 import com.organics.products.entity.EntityType;
 import com.organics.products.entity.Notification;
 import com.organics.products.respository.NotificationRepository;
-import jakarta.transaction.Transactional;
+import jakarta.transaction.Transactional; // Keep this import for other methods
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.CachePut;
 import org.springframework.cache.annotation.Cacheable;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -68,16 +67,14 @@ public class NotificationService {
     }
 
     @Async("notificationExecutor")
-    @Transactional
     public void sendNotificationAsync(Notification notification) {
-        evictCache(notification.getReceiver());
 
         repository.save(notification);
+        log.info("Notification {} saved for receiver: {}", notification.getId(), notification.getReceiver());
+
+        evictCache(notification.getReceiver());
 
         producer.sendNotification(notification);
-
-        log.info("Notification {} saved & published for {}",
-                notification.getId(), notification.getReceiver());
     }
 
 
@@ -138,16 +135,29 @@ public class NotificationService {
         return repository.countNonChatUnreadByReceiver(receiver);
     }
 
-    @CacheEvict(value = { "unreadNotifications", "getAllNotifications", "unreadCount" }, key = "#receiver")
     public void evictCache(String receiver) {
-        Set<String> keys = redisTemplate.keys("getAllNotifications::" + receiver + "_*");
-        if (keys != null && !keys.isEmpty()) redisTemplate.delete(keys);
+        if ("ALL".equalsIgnoreCase(receiver)) {
+            log.info("Broadcast detected: Clearing notification cache for ALL users.");
 
-        keys = redisTemplate.keys("unreadNotifications::" + receiver + "_*");
-        if (keys != null && !keys.isEmpty()) redisTemplate.delete(keys);
+            Set<String> countKeys = redisTemplate.keys("unreadCount::*");
+            if (countKeys != null && !countKeys.isEmpty()) redisTemplate.delete(countKeys);
 
-        keys = redisTemplate.keys("unreadCount::" + receiver + "*");
-        if (keys != null && !keys.isEmpty()) redisTemplate.delete(keys);
+            Set<String> unreadKeys = redisTemplate.keys("unreadNotifications::*");
+            if (unreadKeys != null && !unreadKeys.isEmpty()) redisTemplate.delete(unreadKeys);
+
+            Set<String> allKeys = redisTemplate.keys("getAllNotifications::*");
+            if (allKeys != null && !allKeys.isEmpty()) redisTemplate.delete(allKeys);
+
+        } else {
+            Set<String> keys = redisTemplate.keys("getAllNotifications::" + receiver + "_*");
+            if (keys != null && !keys.isEmpty()) redisTemplate.delete(keys);
+
+            keys = redisTemplate.keys("unreadNotifications::" + receiver + "_*");
+            if (keys != null && !keys.isEmpty()) redisTemplate.delete(keys);
+
+            keys = redisTemplate.keys("unreadCount::" + receiver + "*");
+            if (keys != null && !keys.isEmpty()) redisTemplate.delete(keys);
+        }
     }
 
     public List<Notification> deletedMessage() {
@@ -156,7 +166,14 @@ public class NotificationService {
 
     private void enforceOwnership(String receiver) {
         String currentUser = SecurityUtil.getCurrentUserId().map(String::valueOf).orElseThrow(() -> new RuntimeException("Unauthorized"));
-        if (!currentUser.equals(receiver)) throw new RuntimeException("Forbidden");
+
+        if ("ALL".equalsIgnoreCase(receiver)) {
+            return;
+        }
+
+        if (!currentUser.equals(receiver)) {
+            throw new RuntimeException("Forbidden");
+        }
     }
 
     @Transactional

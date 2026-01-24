@@ -11,11 +11,17 @@ import java.util.List;
 
 public interface NotificationRepository extends JpaRepository<Notification, Long> {
 
-    Page<Notification> findByReceiverAndReadFalse(String receiver, Pageable pageable);
+    @Query("""
+       SELECT n FROM Notification n 
+       WHERE (n.receiver = :receiver OR n.receiver = 'ALL')
+         AND n.read = false 
+         AND n.deleted = false
+    """)
+    Page<Notification> findByReceiverAndReadFalse(@Param("receiver") String receiver, Pageable pageable);
 
     @Query("""
        SELECT n FROM Notification n 
-       WHERE n.receiver = :receiver 
+       WHERE (n.receiver = :receiver OR n.receiver = 'ALL') 
          AND n.deleted = false 
          AND n.category <> 'CHAT'
     """)
@@ -24,7 +30,7 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
 
     @Query("""
        SELECT COUNT(n) FROM Notification n 
-       WHERE n.receiver = :receiver 
+       WHERE (n.receiver = :receiver OR n.receiver = 'ALL')
          AND n.read = false 
          AND n.deleted = false 
          AND n.category <> 'CHAT'
@@ -35,7 +41,7 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
 
     @Query("""
        SELECT COUNT(n) FROM Notification n 
-       WHERE n.receiver = :receiver 
+       WHERE (n.receiver = :receiver OR n.receiver = 'ALL')
          AND n.deleted = false 
          AND n.category <> 'CHAT'
     """)

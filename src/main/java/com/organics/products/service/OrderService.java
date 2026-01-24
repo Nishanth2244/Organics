@@ -15,6 +15,10 @@ import com.organics.products.dto.*;
 import com.organics.products.entity.*;
 import com.organics.products.respository.*;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -321,19 +325,26 @@ public class OrderService {
     }
 
     @Transactional(readOnly = true)
-    public List<OrderDTO> getUserOrders() {
+    public Page<OrderDTO> getUserOrders(int page, int size) {
+
         Long userId = SecurityUtil.getCurrentUserId()
                 .orElseThrow(() -> new ResourceNotFoundException("User not authenticated"));
 
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found: " + userId));
 
-        List<Order> orders = orderRepository.findByUserOrderByOrderDateDesc(user);
+        Pageable pageable = PageRequest.of(page, size, Sort.by("orderDate").descending());
 
-        return orders.stream()
-                .map(this::convertToOrderDTO)
-                .collect(Collectors.toList());
+        Page<Order> orderPage = orderRepository.findByUser(user, pageable);
+
+        if (orderPage.isEmpty()) {
+            log.info("No orders found for userId={}", userId);
+            return Page.empty(pageable);
+        }
+
+        return orderPage.map(this::convertToOrderDTO);
     }
+
 
     @Transactional(readOnly = true)
     public OrderDTO getOrderById(Long orderId) {

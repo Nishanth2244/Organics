@@ -20,7 +20,7 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
 
     List<Order> findByUserOrderByOrderDateDesc(User user);
 
-    List<Order> findByUserId(Long userId);
+    Page<Order> findByUserId(Long userId,Pageable pageable);
 
     List<Order> findByOrderStatusOrderByOrderDateDesc(OrderStatus status);
 
@@ -99,4 +99,6 @@ GROUP BY c.categoryName
             @Param("month") int month,
             @Param("year") int year,
             Pageable pageable);
-    }
+
+    Page<Order> findByUser(User user, Pageable pageable);
+}

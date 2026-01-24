@@ -91,7 +91,7 @@ public class AddressService {
     }
 
 
-    public Page<AddressResponse> getMyAddresses(int page,int size) {
+    public List<AddressResponse> getMyAddresses() {
 
         Long userId = SecurityUtil.getCurrentUserId()
                 .orElseThrow(() -> {
@@ -101,25 +101,19 @@ public class AddressService {
 
         log.info("Fetching addresses for userId={}", userId);
 
-//        User user = userRepository.findById(userId)
-//                .orElseThrow(() -> {
-//                    log.warn("User not found for userId={}", userId);
-//                    return new ResourceNotFoundException("User not found with id: " + userId);
-//                });
-        Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
+        List<Address> addresses = addressRepository.findByUserId(userId);
 
-        Page<Address> addressPage =
-                addressRepository.findByUserId(userId, pageable);
-
-        if (addressPage.isEmpty()) {
+        if (addresses == null || addresses.isEmpty()) {
             log.info("No addresses found for userId={}", userId);
-        } else {
-            log.info("Found {} addresses for userId={}", addressPage.getTotalElements(), userId);
+            return List.of(); // safe immutable empty list
         }
 
-        return addressPage.map(this::mapToResponse);
-    }
+        log.info("Found {} addresses for userId={}", addresses.size(), userId);
 
+        return addresses.stream()
+                .map(this::mapToResponse)
+                .toList();
+    }
 
     public AddressResponse updateAddress(Long addressId, SaveAddressRequest req) {
 

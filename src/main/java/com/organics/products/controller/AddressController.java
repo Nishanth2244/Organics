@@ -29,11 +29,10 @@ public class AddressController {
     }
 
     @GetMapping
-    public ResponseEntity<Page<AddressResponse>> getMyAddresses(
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size
+    public ResponseEntity<List<AddressResponse>> getMyAddresses(
+
     ) {
-        return ResponseEntity.ok(addressService.getMyAddresses(page,size));
+        return ResponseEntity.ok(addressService.getMyAddresses());
     }
 
     @PutMapping("/{addressId}")

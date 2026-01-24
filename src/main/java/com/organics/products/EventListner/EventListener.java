@@ -14,6 +14,7 @@ import org.springframework.data.redis.connection.MessageListener;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
+import java.util.List;
 
 @Component
 public class EventListener implements MessageListener {
@@ -24,10 +25,10 @@ public class EventListener implements MessageListener {
     private ObjectMapper objectMapper;
 
     @Autowired
-    private NotificationPushService notificationPushService; // For Web (SSE)
+    private NotificationPushService notificationPushService;
 
     @Autowired
-    private PushNotificationService pushNotificationService; // For Mobile (Expo)
+    private PushNotificationService pushNotificationService;
 
     @Autowired
     private UserRepository userRepository;
@@ -39,9 +40,8 @@ public class EventListener implements MessageListener {
 
             Notification event = objectMapper.readValue(message.getBody(), Notification.class);
 
-            // 1. Send to Web Dashboard (SSE)
+            // 1. Send to Web Dashboard (SSE) - Handled by updated NotificationPushService
             notificationPushService.sendNotificationToUser(event.getReceiver(), event);
-            log.info("✅ SSE sent to receiver: {}", event.getReceiver());
 
             // 2. Send to Mobile App (Push)
             sendMobilePush(event);
@@ -53,8 +53,23 @@ public class EventListener implements MessageListener {
 
     private void sendMobilePush(Notification event) {
         try {
-            // Only try to send push if receiver is a User ID (numeric)
-            if (isNumeric(event.getReceiver())) {
+            // CASE 1: Broadcast to ALL Users
+            if ("ALL".equalsIgnoreCase(event.getReceiver())) {
+                log.info("Broadcasting Mobile Push to ALL users with tokens.");
+                List<User> allUsers = userRepository.findAll(); // Optimization: use a custom query for users with tokens
+
+                for (User user : allUsers) {
+                    if (user.getExpoPushToken() != null && !user.getExpoPushToken().isEmpty()) {
+                        pushNotificationService.sendNotification(
+                                user.getExpoPushToken(),
+                                event.getSubject(),
+                                event.getMessage()
+                        );
+                    }
+                }
+            }
+            // CASE 2: Single User
+            else if (isNumeric(event.getReceiver())) {
                 Long userId = Long.parseLong(event.getReceiver());
                 User user = userRepository.findById(userId).orElse(null);
 
@@ -65,8 +80,6 @@ public class EventListener implements MessageListener {
                             event.getMessage()
                     );
                     log.info("✅ Mobile Push sent to User ID: {}", userId);
-                } else {
-                    log.debug("Skipping Push: User {} has no Expo Token", userId);
                 }
             }
         } catch (Exception e) {

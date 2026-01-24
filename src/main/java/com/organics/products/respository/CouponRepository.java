@@ -14,7 +14,7 @@ import com.organics.products.entity.Coupon;
 @Repository
 public interface CouponRepository extends JpaRepository<Coupon, Long> {
 
-	Page<Coupon> findByIsActiveTrue(Pageable  pageable);
+	List<Coupon> findByIsActiveTrue( );
 
 	Page<Coupon> findByIsActiveFalse(Pageable  pageable);
 

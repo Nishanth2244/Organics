@@ -37,9 +37,8 @@ public class BannerController {
     }
 
     @GetMapping
-    public Page<BannerResponse> getAll(@RequestParam(defaultValue = "0") int page,
-                                       @RequestParam(defaultValue = "10") int size) {
-        return bannerService.getAllBanners(page,size);
+    public List<BannerResponse> getAll() {
+        return bannerService.getAllBanners();
     }
 
     @DeleteMapping("/{id}")

@@ -10,5 +10,7 @@ public enum EntityType {
     USER,
     SYSTEM,
     BANNER,
-    REVIEW
+    REVIEW,
+
+    DISCOUNT
 }

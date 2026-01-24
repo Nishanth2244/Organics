@@ -261,21 +261,29 @@ public class ProductService {
 
 
 
-	public List<ProductDTO> byCategory(Long categoryId) {
-		log.info("Fetching products by category: {}", categoryId);
+	public Page<ProductDTO> byCategory(Long categoryId, int page, int size) {
+
+		log.info("Fetching products by category: {}, page={}, size={}", categoryId, page, size);
+
 		Category category = categoryRepo.findById(categoryId)
 				.orElseThrow(() -> {
 					log.warn("Category not found: {}", categoryId);
-					return new ProductNotFoundException("Category not found: " + categoryId); });
-		List<Product> products = productRepo.findByCategoryId(category.getId());
-		if (products.isEmpty())
-		{ log.warn("No products found in category: {}", categoryId);
-			return List.of();
+					return new ProductNotFoundException("Category not found: " + categoryId);
+				});
+
+		Pageable pageable = PageRequest.of(page, size, Sort.by("id").descending());
+
+		Page<Product> productPage =
+				productRepo.findByCategoryId(category.getId(), pageable);
+
+		if (productPage.isEmpty()) {
+			log.warn("No products found in category: {}", categoryId);
+			return Page.empty(pageable);
 		}
-		return products.stream()
-				.map(this::convertToDTO)
-				.collect(Collectors.toList());
+
+		return productPage.map(this::convertToDTO);
 	}
+
 
 
 	public Page<ProductDTO> searchByName(String name, int page, int size) {

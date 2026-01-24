@@ -113,23 +113,24 @@ public class BannerService {
 
 
     @Transactional(readOnly = true)
-    public Page<BannerResponse> getAllBanners(int page, int size) {
+    public List<BannerResponse> getAllBanners() {
 
-        log.info("Fetching all banners: page={}, size={}", page, size);
+        log.info("Fetching all banners");
 
-        Pageable pageable = PageRequest.of(page, size, Sort.by("id").descending());
+        List<Banner> banners = bannerRepository.findAll();
 
-        Page<Banner> bannersPage = bannerRepository.findAll(pageable);
-
-        if (bannersPage.isEmpty()) {
+        if (banners == null || banners.isEmpty()) {
             log.info("No banners found");
-            return Page.empty(pageable);
+            return List.of(); // safe empty list
         }
 
-        log.info("Found {} banners", bannersPage.getTotalElements());
+        log.info("Found {} banners", banners.size());
 
-        return bannersPage.map(this::mapToResponse);
+        return banners.stream()
+                .map(this::mapToResponse)
+                .toList();
     }
+
 
 
 

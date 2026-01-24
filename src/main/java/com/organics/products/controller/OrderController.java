@@ -44,8 +44,11 @@ public class OrderController {
     }
 
     @GetMapping("/my-orders")
-    public ResponseEntity<List<OrderDTO>> getUserOrders() {
-        List<OrderDTO> orders = orderService.getUserOrders();
+    public ResponseEntity<Page<OrderDTO>> getUserOrders(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+
+        Page<OrderDTO> orders = orderService.getUserOrders(page, size);
         return ResponseEntity.ok(orders);
     }
 

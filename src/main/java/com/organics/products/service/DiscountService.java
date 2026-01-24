@@ -30,6 +30,7 @@ public class DiscountService {
     private final ProductRepo productRepo;
     private final CategoryRepo categoryRepo;
     private final CartRepository cartRepository;
+    private final NotificationService notificationService;
 
     public DiscountService(DiscountRepository discountRepository,
                            ProductDiscountRepository productDiscountRepository,
@@ -37,7 +38,7 @@ public class DiscountService {
                            CartDiscountRepository cartDiscountRepository,
                            ProductRepo productRepo,
                            CategoryRepo categoryRepo,
-                           CartRepository cartRepository) {
+                           CartRepository cartRepository, NotificationService notificationService) {
         this.discountRepository = discountRepository;
         this.productDiscountRepository = productDiscountRepository;
         this.categoryDiscountRepository = categoryDiscountRepository;
@@ -45,6 +46,7 @@ public class DiscountService {
         this.productRepo = productRepo;
         this.categoryRepo = categoryRepo;
         this.cartRepository = cartRepository;
+        this.notificationService = notificationService;
     }
 
 
@@ -68,6 +70,22 @@ public class DiscountService {
         Discount saved = discountRepository.save(discount);
 
         log.info("Discount created successfully: id={}", saved.getId());
+        try {
+            notificationService.sendNotification(
+                    "ALL", // Receiver
+                    "New Discount Available: " + saved.getName() + " (" + saved.getDiscountValue() + "% OFF)",
+                    "ADMIN",
+                    "DISCOUNT_ALERT",
+                    "/products",
+                    "Promotions",
+                    "General",
+                    "Price Drop Alert!",
+                    EntityType.DISCOUNT,
+                    saved.getId()
+            );
+        } catch (Exception e) {
+            log.error("Failed to send discount notification", e);
+        }
 
         return convertToDTO(saved);
     }
@@ -256,20 +274,22 @@ public class DiscountService {
 
         return dto;
     }
+    public List<DiscountDTO> getAll() {
 
-    public Page<DiscountDTO> getAll(int page, int size) {
+        log.info("Fetching all discounts");
 
-        log.info("Fetching all discounts: page={}, size={}", page, size);
+        List<Discount> discounts = discountRepository.findAll();
 
-        Pageable pageable = PageRequest.of(page, size, Sort.by("id").descending());
-
-        Page<Discount> discountsPage = discountRepository.findAll(pageable);
-
-        if (discountsPage.isEmpty()) {
+        if (discounts == null || discounts.isEmpty()) {
             log.warn("No discounts found");
-            return Page.empty(pageable);
+            return List.of();
         }
 
-        return discountsPage.map(this::convertToDTO);
+        log.info("Found {} discounts", discounts.size());
+
+        return discounts.stream()
+                .map(this::convertToDTO)
+                .toList();
     }
+
 }

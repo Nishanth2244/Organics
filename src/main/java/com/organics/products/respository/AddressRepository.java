@@ -34,7 +34,7 @@ void clearPrimary(Long userId);
 
 
 
-    Page<Address> findByUserId(Long userId, Pageable pageable);
+    List<Address> findByUserId(Long userId);
 
 
     Optional<Address> findById(Long id);

@@ -9,6 +9,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
 @Slf4j
 @RestController
 @RequestMapping("/api/admin/discounts")
@@ -46,11 +49,11 @@ public class DiscountController {
         return ResponseEntity.ok("Discount assigned to cart");
     }
     @GetMapping
-    public ResponseEntity<Page<DiscountDTO>> getAll(
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) {
+    public ResponseEntity<List<DiscountDTO>> getAll() {
 
-        return ResponseEntity.ok(discountService.getAll(page, size));
+        List<DiscountDTO> discounts = discountService.getAll();
+        return ResponseEntity.ok(discounts);
     }
+
 
 }
