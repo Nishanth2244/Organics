@@ -68,6 +68,9 @@ public class OrderService {
     
     @Autowired
     private CouponRepository couponRepository;
+    
+    @Autowired
+    private DiscountService discountService;
 
 
     @Transactional
@@ -951,9 +954,8 @@ public class OrderService {
 
     @Transactional
     public OrderDTO buyNowOrder(BuyNowRequestDTO request) {
-
-        Long userId = SecurityUtil.getCurrentUserId().
-                orElseThrow(() -> new RuntimeException("User not authenticated"));
+        Long userId = SecurityUtil.getCurrentUserId()
+                .orElseThrow(() -> new RuntimeException("User not authenticated"));
 
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
@@ -964,29 +966,21 @@ public class OrderService {
         Address selectedAddress = addressRepository.findById(request.getAddressId())
                 .orElseThrow(() -> new ResourceNotFoundException("Address not found"));
 
-
+        // 1. Product MRP and Base Discount Calculation (Product or Category)
         Double mrp = product.getMRP();
-        Double discountedUnitPrice = mrp;
-        Double productDiscountPerItem = 0.0;
+        
+        // discountService use chesi final price (Product/Category discount apply ayyaka) techukuntunnam
+        Double discountedUnitPrice = discountService.calculateFinalPrice(product);
+        Double productDiscountPerItem = mrp - discountedUnitPrice; // Ee discount already apply ayipoindi
 
-        List<ProductDiscount> productDiscounts = productDiscountRepository.findByProductId(product.getId());
-        Optional<ProductDiscount> activeDiscount = productDiscounts.stream().filter(pd -> pd.getDiscount().getActive())
-                .findFirst();
-
-        if (activeDiscount.isPresent()) {
-            Discount d = activeDiscount.get().getDiscount();
-            if (d.getDiscountType() == DiscountType.PERCENT) {
-                productDiscountPerItem = (mrp * d.getDiscountValue()) / 100;
-            } else {
-                productDiscountPerItem = d.getDiscountValue();
-            }
-            discountedUnitPrice = mrp - productDiscountPerItem;
-        }
-
+        // 2. Subtotal calculation
         Double subTotal = discountedUnitPrice * request.getQuantity();
         Double finalOrderAmount = subTotal;
         Double couponDiscountTotal = 0.0;
+        
+        log.info("Order amount after item/category discount: {}", finalOrderAmount);
 
+        // 3. Coupon Discount Calculation (Max discount limit lekunda)
         if (request.getCouponCode() != null && !request.getCouponCode().isEmpty()) {
             Coupon coupon = couponRepository.findByCode(request.getCouponCode());
 
@@ -1002,44 +996,41 @@ public class OrderService {
                 throw new RuntimeException("Minimum order amount for this coupon is: " + coupon.getMinOrderAmount());
             }
 
+            // Percentage unte motham amount meeda apply chesthunnam (Max amount condition lekunda)
             if (coupon.getDiscountType() == DiscountType.PERCENT) {
                 couponDiscountTotal = (subTotal * coupon.getDiscountValue()) / 100;
-                if (coupon.getMaxDiscountAmount() != null && couponDiscountTotal > coupon.getMaxDiscountAmount()) {
-                    couponDiscountTotal = coupon.getMaxDiscountAmount();
-                }
             } else {
                 couponDiscountTotal = coupon.getDiscountValue();
             }
 
             finalOrderAmount = subTotal - couponDiscountTotal;
+            log.info("Coupon discount amount: {}", couponDiscountTotal);
         }
 
+        // 4. Create Order
         Order order = new Order();
         order.setUser(user);
         order.setOrderDate(LocalDate.now());
-        order.setOrderAmount(finalOrderAmount);
+        order.setOrderAmount(finalOrderAmount); // Final amount after all discounts
         order.setOrderStatus(OrderStatus.PENDING);
         order.setPaymentStatus(PaymentStatus.PENDING);
         order.setShippingAddress(selectedAddress);
 
-
-        log.error("final amount after coupon and discount calcluaction {}", finalOrderAmount);
-
         Order savedOrder = orderRepository.save(order);
 
+        // 5. Save Order Items
         OrderItems orderItem = new OrderItems();
         orderItem.setOrder(savedOrder);
         orderItem.setProduct(product);
         orderItem.setQuantity(request.getQuantity());
-
-        orderItem.setPrice(discountedUnitPrice);
+        orderItem.setPrice(discountedUnitPrice); // Item base price (after product/category discount)
         orderItem.setDiscount(productDiscountPerItem);
-        orderItem.setTax(mrp * 0.05);
+        orderItem.setTax(mrp * 0.05); // Standard tax on MRP
 
         orderItemsRepository.save(orderItem);
-
         orderRepository.flush();
 
+        // 6. Inventory Reservation
         List<Inventory> inventories = inventoryRepository.findByProductId(product.getId());
         if (!inventories.isEmpty()) {
             inventoryService.reserveStock(inventories.get(0).getId(), request.getQuantity(), savedOrder.getId());
