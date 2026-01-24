@@ -13,14 +13,9 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 import com.organics.products.dto.*;
-import com.organics.products.dto.*;
 import com.organics.products.entity.*;
 import com.organics.products.respository.*;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -40,12 +35,8 @@ public class OrderService {
 	@Autowired
 	private CartRepository cartRepository;
 
-    @Autowired
-    private OrderRepository orderRepository;
-
-    @Autowired
-    private NotificationService notificationService;
-
+	@Autowired
+	private OrderRepository orderRepository;
 
 	@Autowired
 	private OrderItemsRepository orderItemsRepository;
@@ -304,26 +295,14 @@ public class OrderService {
 	public List<OrderDTO> getUserOrders() {
 		Long userId = SecurityUtil.getCurrentUserId()
 				.orElseThrow(() -> new ResourceNotFoundException("User not authenticated"));
-    @Transactional(readOnly = true)
-    public Page<OrderDTO> getUserOrders(int page, int size) {
-
-        Long userId = SecurityUtil.getCurrentUserId()
-                .orElseThrow(() -> new ResourceNotFoundException("User not authenticated"));
 
 		User user = userRepository.findById(userId)
 				.orElseThrow(() -> new ResourceNotFoundException("User not found: " + userId));
 
 		List<Order> orders = orderRepository.findByUserOrderByOrderDateDesc(user);
-        Pageable pageable = PageRequest.of(page, size, Sort.by("orderDate").descending());
 
-        Page<Order> orders = orderRepository.findByUserOrderByOrderDateDesc(user, pageable);
-
-        if (orders.isEmpty()) {
-            return Page.empty(pageable);
-        }
-
-        return orders.map(this::convertToOrderDTO);
-    }
+		return orders.stream().map(this::convertToOrderDTO).collect(Collectors.toList());
+	}
 
 	@Transactional(readOnly = true)
 	public OrderDTO getOrderById(Long orderId) {
@@ -340,18 +319,16 @@ public class OrderService {
 		return convertToOrderDTO(order);
 	}
 
-    @Transactional(readOnly = true)
-    public Page<OrderDTO> getAllOrders(int page,int size) {
-        if (!SecurityUtil.isAdmin()) {
-            throw new RuntimeException("Unauthorized: Admin access required");
-        }
-        Pageable pageable = PageRequest.of(page, size);
+	@Transactional(readOnly = true)
+	public List<OrderDTO> getAllOrders() {
+		if (!SecurityUtil.isAdmin()) {
+			throw new RuntimeException("Unauthorized: Admin access required");
+		}
 
-        Page<Order> orders = orderRepository.findAllByOrderByOrderDateDesc(pageable);
+		List<Order> orders = orderRepository.findAllByOrderByOrderDateDesc();
 
-        return orders
-                .map(this::convertToOrderDTO);
-    }
+		return orders.stream().map(this::convertToOrderDTO).collect(Collectors.toList());
+	}
 
 	@Transactional(readOnly = true)
 	public List<OrderDTO> getOrdersByStatus(OrderStatus status) {
@@ -503,19 +480,18 @@ public class OrderService {
 			addressDTO.setAddressType(String.valueOf(address.getAddressType()));
 			addressDTO.setIsPrimary(address.getIsPrimary());
 
-            dto.setShippingAddress(addressDTO);
-        } else {
-            dto.setShippingAddress(null);
-        }
-        dto.setShiprocketOrderId(order.getShiprocketOrderId());
-        dto.setShiprocketShipmentId(order.getShiprocketShipmentId());
-        dto.setShiprocketAwbCode(order.getShiprocketAwbCode());
-        dto.setShiprocketCourierName(order.getShiprocketCourierName());
-        dto.setShiprocketLabelUrl(order.getShiprocketLabelUrl());
-        dto.setShiprocketTrackingUrl(order.getShiprocketTrackingUrl());
+			dto.setShippingAddress(addressDTO);
+		} else {
+			dto.setShippingAddress(null);
+		}
+		dto.setShiprocketOrderId(order.getShiprocketOrderId());
+		dto.setShiprocketShipmentId(order.getShiprocketShipmentId());
+		dto.setShiprocketAwbCode(order.getShiprocketAwbCode());
+		dto.setShiprocketCourierName(order.getShiprocketCourierName());
+		dto.setShiprocketLabelUrl(order.getShiprocketLabelUrl());
+		dto.setShiprocketTrackingUrl(order.getShiprocketTrackingUrl());
 
-        dto.setPaymentStatus(String.valueOf(order.getPaymentStatus()));
-
+		dto.setPaymentStatus(String.valueOf(order.getPaymentStatus()));
 
 		if (order.getPayment() != null) {
 			dto.setRazorpayOrderId(order.getPayment().getRazorpayOrderId());
@@ -842,38 +818,37 @@ public class OrderService {
 
 		Address pickupAddress = getWarehouseAddress();
 
-        return shiprocketService.checkServiceability(pickupAddress, deliveryAddress, 1.0);
-    }
+		return shiprocketService.checkServiceability(pickupAddress, deliveryAddress, 1.0);
+	}
 
+	@Transactional
+	public void sendOrderToShiprocket(Long orderId) {
+		Order order = orderRepository.findById(orderId)
+				.orElseThrow(() -> new ResourceNotFoundException("Order not found"));
 
-    @Transactional
-    public void sendOrderToShiprocket(Long orderId) {
-        Order order = orderRepository.findById(orderId)
-                .orElseThrow(() -> new ResourceNotFoundException("Order not found"));
+		try {
+			ShiprocketCreateOrderResponse shiprocketResponse = shiprocketService.createOrder(order, order.getUser(),
+					order.getShippingAddress());
 
-        try {
-            ShiprocketCreateOrderResponse shiprocketResponse = shiprocketService.createOrder(order, order.getUser(), order.getShippingAddress());
-
-            if (shiprocketResponse.getOrderId() != null && shiprocketResponse.getOrderId() > 0) {
-                order.setShiprocketOrderId(String.valueOf(shiprocketResponse.getOrderId()));
-                order.setShiprocketShipmentId(shiprocketResponse.getShipmentId());
-                order.setShiprocketAwbCode(shiprocketResponse.getAwbCode());
-                order.setShiprocketTrackingUrl("https://shiprocket.co/tracking/" + shiprocketResponse.getAwbCode());
-                //order.setOrderStatus(OrderStatus.PENDING); // Ikada confirm chestunnam
-                orderRepository.save(order);
-                log.info("✅ Shiprocket order created successfully for Order ID: {}", orderId);
-            }
-        } catch (Exception e) {
-            log.error("❌ Failed to send order to Shiprocket: {}", e.getMessage());
-        }
-    }
-
+			if (shiprocketResponse.getOrderId() != null && shiprocketResponse.getOrderId() > 0) {
+				order.setShiprocketOrderId(String.valueOf(shiprocketResponse.getOrderId()));
+				order.setShiprocketShipmentId(shiprocketResponse.getShipmentId());
+				order.setShiprocketAwbCode(shiprocketResponse.getAwbCode());
+				order.setShiprocketTrackingUrl("https://shiprocket.co/tracking/" + shiprocketResponse.getAwbCode());
+				// order.setOrderStatus(OrderStatus.PENDING); // Ikada confirm chestunnam
+				orderRepository.save(order);
+				log.info("✅ Shiprocket order created successfully for Order ID: {}", orderId);
+			}
+		} catch (Exception e) {
+			log.error("❌ Failed to send order to Shiprocket: {}", e.getMessage());
+		}
+	}
 
 	// Add this method to your OrderService class
 
 	@Transactional(readOnly = true)
 	public List<TopOrderedProductsDTO> getTopOrderedProducts(Integer limit, LocalDate startDate, LocalDate endDate,
-			Long inventoryId) {
+															 Long inventoryId) {
 		if (!SecurityUtil.isAdmin()) {
 			throw new RuntimeException("Unauthorized: Admin access required");
 		}
@@ -929,26 +904,26 @@ public class OrderService {
 
 		return results.stream().limit(10).collect(Collectors.toList());
 	}
-	
+
 
 	@Autowired
 	private CouponRepository couponRepository;
 
 	@Transactional
 	public OrderDTO buyNowOrder(BuyNowRequestDTO request) {
-		
+
 		Long userId = SecurityUtil.getCurrentUserId().
 				orElseThrow(() -> new RuntimeException("User not authenticated"));
-		
+
 		User user = userRepository.findById(userId)
 				.orElseThrow(() -> new ResourceNotFoundException("User not found"));
-		
+
 		Product product = productRepository.findById(request.getProductId())
 				.orElseThrow(() -> new ResourceNotFoundException("Product not found"));
-		
+
 		Address selectedAddress = addressRepository.findById(request.getAddressId())
 				.orElseThrow(() -> new ResourceNotFoundException("Address not found"));
-		
+
 
 		Double mrp = product.getMRP();
 		Double discountedUnitPrice = mrp;
@@ -977,8 +952,8 @@ public class OrderService {
 
 			if(coupon == null) {
 				throw new ResourceNotFoundException("Coupon not valid");
-				}
-			
+			}
+
 			if (!coupon.isActive() || coupon.getEndDate().isBefore(LocalDate.now())) {
 				throw new RuntimeException("Coupon expired or inactive");
 			}
@@ -1002,14 +977,14 @@ public class OrderService {
 		Order order = new Order();
 		order.setUser(user);
 		order.setOrderDate(LocalDate.now());
-		order.setOrderAmount(finalOrderAmount); 
+		order.setOrderAmount(finalOrderAmount);
 		order.setOrderStatus(OrderStatus.PENDING);
 		order.setPaymentStatus(PaymentStatus.PENDING);
 		order.setShippingAddress(selectedAddress);
 
-		
+
 		log.error("final amount after coupon and discount calcluaction {}", finalOrderAmount);
-		   
+
 		Order savedOrder = orderRepository.save(order);
 
 		OrderItems orderItem = new OrderItems();
@@ -1018,11 +993,11 @@ public class OrderService {
 		orderItem.setQuantity(request.getQuantity());
 
 		orderItem.setPrice(discountedUnitPrice);
-		orderItem.setDiscount(productDiscountPerItem); 
+		orderItem.setDiscount(productDiscountPerItem);
 		orderItem.setTax(mrp * 0.05);
 
 		orderItemsRepository.save(orderItem);
-		
+
 		orderRepository.flush();
 
 		List<Inventory> inventories = inventoryRepository.findByProductId(product.getId());

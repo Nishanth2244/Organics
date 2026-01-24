@@ -35,7 +35,6 @@ public class NotificationService {
     @Autowired
     private NotificationProducer producer;
 
-    // REMOVED: UserRepository and PushNotificationService are not needed here anymore
 
     public void sendNotification(String receiver,
                                  String message,
@@ -73,17 +72,14 @@ public class NotificationService {
     public void sendNotificationAsync(Notification notification) {
         evictCache(notification.getReceiver());
 
-        // 1. Save to DB
         repository.save(notification);
 
-        // 2. Publish to Redis (EventListener will pick this up for BOTH SSE and Push)
         producer.sendNotification(notification);
 
         log.info("Notification {} saved & published for {}",
                 notification.getId(), notification.getReceiver());
     }
 
-    // ... [Keep all the other methods (getUnreadNotifications, markAsRead, etc.) exactly as they were] ...
 
     @Cacheable(value = "unreadNotifications", key = "#receiver + '_' + #page + '_' + #size")
     @Transactional
@@ -135,7 +131,7 @@ public class NotificationService {
         evictCache(notification.getReceiver());
     }
 
-    @CachePut(value = "unreadCount", key = "#receiver")
+    @Cacheable(value = "unreadCount", key = "#receiver")
     @Transactional
     public Long getUnreadCount(String receiver) {
         enforceOwnership(receiver);

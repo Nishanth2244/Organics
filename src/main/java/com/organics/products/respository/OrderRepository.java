@@ -18,13 +18,13 @@ import java.util.Optional;
 @Repository
 public interface OrderRepository extends JpaRepository<Order, Long> {
 
-    Page<Order> findByUserOrderByOrderDateDesc(User user,Pageable pageable);
+    List<Order> findByUserOrderByOrderDateDesc(User user);
 
     List<Order> findByUserId(Long userId);
 
     List<Order> findByOrderStatusOrderByOrderDateDesc(OrderStatus status);
 
-    Page<Order> findAllByOrderByOrderDateDesc(Pageable pageable);
+    List<Order> findAllByOrderByOrderDateDesc();
 
     List<Order> findByOrderDateOrderByOrderDateDesc(LocalDate date);
 

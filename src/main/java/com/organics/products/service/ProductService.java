@@ -202,51 +202,44 @@ public class ProductService {
 		return products.map(this::convertToDTO);
 	}
 
-	public Product updateProduct(Long id,
-								 MultipartFile[] images,
-								 String productName,
-								 String brand,
-								 String description,
-								 Integer returnDays,
-								 Double mrp,
-								 Long categoryId,
-								 UnitType unitType,
-								 Double netWeight) throws IOException {
-
-		log.info("Updating product: {}", id);
+	public ProductDTO updateProduct(Long id, MultipartFile[] images, String productName, String brand, String description,
+									Integer returnDays, Double mrp, Long categoryId, UnitType unitType, Double netWeight) throws IOException {
 
 		Product product = productRepo.findById(id)
-				.orElseThrow(() -> {
-					log.warn("Product not found for update: {}", id);
-					return new ProductNotFoundException("Product not found: " + id);
-				});
+				.orElseThrow(() -> new ResourceNotFoundException("Product not found with id: " + id));
 
-		if (productName != null) product.setProductName(productName);
-		if (brand != null) product.setBrand(brand);
-		if (description != null) product.setDescription(description);
-		if (returnDays != null) product.setReturnDays(returnDays);
-		if (mrp != null) product.setMRP(mrp);
-		if (unitType != null) product.setUnit(unitType);
-		if (netWeight != null) product.setNetWeight(netWeight);
+		if (productName != null)
+			product.setProductName(productName);
+		if (brand != null)
+			product.setBrand(brand);
+		if (description != null)
+			product.setDescription(description);
+		if (returnDays != null)
+			product.setReturnDays(returnDays);
+		if (mrp != null)
+			product.setMRP(mrp);
+
+		if(unitType != null) {
+			product.setUnit(unitType);
+		}
+
+		if(netWeight != null) {
+			product.setNetWeight(netWeight);
+		}
+
 
 		if (categoryId != null) {
 			Category category = categoryRepo.findById(categoryId)
-					.orElseThrow(() -> {
-						log.warn("Category not found: {}", categoryId);
-						return new ProductNotFoundException("Category not found: " + categoryId);
-					});
-
+					.orElseThrow(() -> new ResourceNotFoundException("Category not found"));
 			product.setCategory(category);
 		}
 
 		if (images != null && images.length > 0) {
-
-			log.info("Updating product images: {}", id);
-
 			if (product.getImages() != null) {
 				for (ProductImage oldImg : product.getImages()) {
 					s3Service.deleteFile(oldImg.getImageUrl());
 				}
+
 				product.getImages().clear();
 			} else {
 				product.setImages(new ArrayList<>());
@@ -254,7 +247,6 @@ public class ProductService {
 
 			for (MultipartFile file : images) {
 				String url = s3Service.uploadFile(file);
-
 				ProductImage img = new ProductImage();
 				img.setImageUrl(url);
 				img.setProduct(product);
@@ -263,11 +255,8 @@ public class ProductService {
 			}
 		}
 
-		Product updated = productRepo.save(product);
-
-		log.info("Product updated successfully: {}", id);
-
-		return updated;
+		Product savedProduct = productRepo.save(product);
+		return convertToDTO(savedProduct);
 	}
 
 

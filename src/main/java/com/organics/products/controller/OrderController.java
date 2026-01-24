@@ -44,8 +44,8 @@ public class OrderController {
     }
 
     @GetMapping("/my-orders")
-    public ResponseEntity<Page<OrderDTO>> getUserOrders(@RequestParam(defaultValue = "0")int page,@RequestParam(defaultValue = "10")int size) {
-        Page<OrderDTO> orders = orderService.getUserOrders(page,size);
+    public ResponseEntity<List<OrderDTO>> getUserOrders() {
+        List<OrderDTO> orders = orderService.getUserOrders();
         return ResponseEntity.ok(orders);
     }
 
@@ -88,8 +88,8 @@ public class OrderController {
     }
 
     @GetMapping("/admin/all")
-    public ResponseEntity<Page<OrderDTO>> getAllOrders(@RequestParam(defaultValue = "0")int page,@RequestParam(defaultValue = "10")int size) {
-        Page<OrderDTO> orders = orderService.getAllOrders(page,size);
+    public ResponseEntity<List<OrderDTO>> getAllOrders() {
+        List<OrderDTO> orders = orderService.getAllOrders();
         return ResponseEntity.ok(orders);
     }
 
