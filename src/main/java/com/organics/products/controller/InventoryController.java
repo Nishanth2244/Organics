@@ -75,7 +75,6 @@ public class InventoryController {
         return ResponseEntity.noContent().build();
     }
 
-    // RELEASE STOCK (Cancel / payment failed)
     @PostMapping("/inventory/{inventoryId}/release")
     public ResponseEntity<Void> releaseStock(
             @PathVariable Long inventoryId,

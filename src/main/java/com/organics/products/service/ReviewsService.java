@@ -99,13 +99,13 @@ public class ReviewsService {
         if (rating < 1 || rating > 5) {
             throw new RuntimeException("Rating must be between 1 and 5");
         }
-
-        boolean delivered = orderItemsRepository
-                .existsByOrderUserIdAndProductIdAndOrderOrderStatus(
-                        userId, productId, OrderStatus.DELIVERED);
-
-        if (!delivered)
-            throw new RuntimeException("You can review only after delivery");
+//
+//        boolean delivered = orderItemsRepository
+//                .existsByOrderUserIdAndProductIdAndOrderOrderStatus(
+//                        userId, productId, OrderStatus.DELIVERED);
+//
+//        if (!delivered)
+//            throw new RuntimeException("You can review only after delivery");
 
         if (reviewsRepository.existsByUserIdAndProductId(userId, productId))
             throw new RuntimeException("You already reviewed this product");

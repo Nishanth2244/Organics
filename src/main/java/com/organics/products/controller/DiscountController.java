@@ -3,7 +3,9 @@ package com.organics.products.controller;
 import com.organics.products.dto.DiscountDTO;
 import com.organics.products.dto.DiscountRequestDTO;
 import com.organics.products.entity.Discount;
+import com.organics.products.entity.EntityType;
 import com.organics.products.service.DiscountService;
+import com.organics.products.service.NotificationService;
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -19,13 +21,32 @@ public class DiscountController {
 
     private final DiscountService discountService;
 
-    public DiscountController(DiscountService discountService) {
+    private final NotificationService notificationService;
+
+    public DiscountController(DiscountService discountService, NotificationService notificationService) {
         this.discountService = discountService;
+        this.notificationService = notificationService;
     }
 
     @PostMapping
-    public ResponseEntity<DiscountDTO> create(@RequestBody @Valid DiscountRequestDTO dto) {
-        return ResponseEntity.ok(discountService.createDiscount(dto));
+    public ResponseEntity<DiscountDTO> create(@RequestBody DiscountRequestDTO dto) {
+
+        DiscountDTO saved = discountService.createDiscount(dto);
+
+        notificationService.sendNotification(
+                "ALL",
+                "New Discount Available: " + saved.getName(),
+                "ADMIN",
+                "DISCOUNT_ALERT",
+                "/products",
+                "Promotions",
+                "General",
+                "Price Drop Alert!",
+                EntityType.DISCOUNT,
+                saved.getId()
+        );
+
+        return ResponseEntity.ok(saved);
     }
 
     @PostMapping("/assign/product")

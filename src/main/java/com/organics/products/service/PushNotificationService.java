@@ -19,7 +19,6 @@ public class PushNotificationService {
     @Autowired
     private UserRepository userRepository;
 
-    // Optimized: Reusing ObjectMapper and RestTemplate
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final RestTemplate restTemplate = new RestTemplate();
 
@@ -69,7 +68,6 @@ public class PushNotificationService {
         }
     }
 
-    // Optional: Keep this if you want to use the broadcast controller endpoint later
     public void sendBroadcastNotification(String title, String body) {
         List<User> allUsers = userRepository.findAll();
         List<ExpoPushMessage> messages = allUsers.stream()

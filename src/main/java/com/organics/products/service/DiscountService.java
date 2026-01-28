@@ -70,22 +70,7 @@ public class DiscountService {
         Discount saved = discountRepository.save(discount);
 
         log.info("Discount created successfully: id={}", saved.getId());
-        try {
-            notificationService.sendNotification(
-                    "ALL", // Receiver
-                    "New Discount Available: " + saved.getName() + " (" + saved.getDiscountValue() + "% OFF)",
-                    "ADMIN",
-                    "DISCOUNT_ALERT",
-                    "/products",
-                    "Promotions",
-                    "General",
-                    "Price Drop Alert!",
-                    EntityType.DISCOUNT,
-                    saved.getId()
-            );
-        } catch (Exception e) {
-            log.error("Failed to send discount notification", e);
-        }
+
 
         return convertToDTO(saved);
     }

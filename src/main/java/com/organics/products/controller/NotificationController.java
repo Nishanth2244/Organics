@@ -30,6 +30,7 @@ public class NotificationController {
     @Autowired
     private PushNotificationService pushNotificationService;
 
+
     @PostMapping("/send")
     public ResponseEntity<String> sendNotification(@RequestBody Notification notification) {
 
@@ -272,5 +273,16 @@ public class NotificationController {
         pushNotificationService.sendBroadcastNotification(title, message);
 
         return ResponseEntity.ok("Broadcast process started");
+    }
+    @DeleteMapping("/deleteAll")
+    public ResponseEntity<String> deleteAll() {
+
+        String userId = SecurityUtil.getCurrentUserId()
+                .map(String::valueOf)
+                .orElseThrow(() -> new RuntimeException("Unauthorized"));
+
+        notificationService.deleteAllMessages(userId);
+
+        return ResponseEntity.ok("All notifications deleted successfully");
     }
 }

@@ -3,160 +3,234 @@ package com.organics.products.service;
 import com.organics.products.config.SecurityUtil;
 import com.organics.products.entity.EntityType;
 import com.organics.products.entity.Notification;
+import com.organics.products.entity.User;
 import com.organics.products.respository.NotificationRepository;
-import jakarta.transaction.Transactional; // Keep this import for other methods
+import com.organics.products.respository.UserRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.CacheEvict;
-import org.springframework.cache.annotation.CachePut;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 @Slf4j
 public class NotificationService {
 
     @Autowired
-    private RedisTemplate<String, Object> redisTemplate;
+    private NotificationRepository repository;
 
     @Autowired
-    private NotificationRepository repository;
+    private UserRepository userRepository;
 
     @Autowired
     private NotificationProducer producer;
 
+    @Autowired
+    private RedisTemplate<String, Object> redisTemplate; // Re-introduced for manual eviction
 
-    public void sendNotification(String receiver,
-                                 String message,
-                                 String sender,
-                                 String type,
-                                 String link,
-                                 String category,
-                                 String kind,
-                                 String subject,
-                                 EntityType entityType,
-                                 Long entityId) {
+    // ==================================================================================
+    // SENDING LOGIC
+    // ==================================================================================
 
-        Notification notification = Notification.builder()
-                .receiver(receiver)
-                .message(message)
-                .sender(sender)
-                .type(type)
-                .link(link)
-                .read(false)
-                .createdAt(LocalDateTime.now())
-                .category(category)
-                .kind(kind)
-                .subject(subject)
-                .entityType(entityType)
-                .entityId(entityId)
-                .stared(false)
-                .deleted(false)
+    public void sendNotification(String receiver, String message, String sender, String type,
+                                 String link, String category, String kind, String subject,
+                                 EntityType entityType, Long entityId) {
+
+        Notification baseData = Notification.builder()
+                .message(message).sender(sender).type(type).link(link)
+                .read(false).createdAt(LocalDateTime.now()).category(category)
+                .kind(kind).subject(subject).entityType(entityType).entityId(entityId)
+                .stared(false).deleted(false)
                 .build();
 
-        sendNotificationAsync(notification);
+        if ("ALL".equalsIgnoreCase(receiver)) {
+            sendBroadcastNotificationAsync(baseData);
+        } else {
+            baseData.setReceiver(receiver);
+            sendSingleNotificationAsync(baseData);
+        }
     }
 
     @Async("notificationExecutor")
-    public void sendNotificationAsync(Notification notification) {
-
+    public void sendSingleNotificationAsync(Notification notification) {
         repository.save(notification);
-        log.info("Notification {} saved for receiver: {}", notification.getId(), notification.getReceiver());
-
-        evictCache(notification.getReceiver());
-
+        manualEvictUserCache(notification.getReceiver()); // Manual Eviction
         producer.sendNotification(notification);
     }
 
+    @Async("notificationExecutor")
+    public void sendBroadcastNotificationAsync(Notification baseData) {
+        log.info("Processing Broadcast: {}", baseData.getSubject());
+
+        int pageSize = 500;
+        int page = 0;
+        Page<User> userPage;
+
+        do {
+            userPage = userRepository.findAll(PageRequest.of(page, pageSize));
+            List<User> users = userPage.getContent();
+
+            List<Notification> batch = users.stream().map(user -> Notification.builder()
+                    .receiver(String.valueOf(user.getId()))
+                    .message(baseData.getMessage())
+                    .sender(baseData.getSender())
+                    .type(baseData.getType())
+                    .link(baseData.getLink())
+                    .read(false)
+                    .createdAt(LocalDateTime.now())
+                    .category(baseData.getCategory())
+                    .kind(baseData.getKind())
+                    .subject(baseData.getSubject())
+                    .entityType(baseData.getEntityType())
+                    .entityId(baseData.getEntityId())
+                    .stared(false)
+                    .deleted(false)
+                    .build()
+            ).collect(Collectors.toList());
+
+            if (!batch.isEmpty()) {
+                repository.saveAll(batch);
+            }
+            page++;
+        } while (userPage.hasNext());
+
+        evictAllCaches(); // Clear global cache
+        baseData.setReceiver("ALL");
+        producer.sendNotification(baseData);
+    }
+
+    // ==================================================================================
+    // FETCHING LOGIC
+    // ==================================================================================
+
+    @Cacheable(value = "unreadCount", key = "#receiver")
+    public Long getUnreadCount(String receiver) {
+        enforceOwnership(receiver);
+        return repository.countByReceiverAndReadFalseAndDeletedFalse(receiver);
+    }
 
     @Cacheable(value = "unreadNotifications", key = "#receiver + '_' + #page + '_' + #size")
-    @Transactional
+    @Transactional(readOnly = true)
     public List<Notification> getUnreadNotifications(String receiver, Integer page, Integer size) {
         enforceOwnership(receiver);
         Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
-        return repository.findByReceiverAndReadFalse(receiver, pageable).getContent();
-    }
-
-    public void stardMessage(Long id, String userId) {
-        Notification notification = repository.findById(id).orElseThrow(() -> new RuntimeException("Notification not found"));
-        enforceOwnership(notification.getReceiver());
-        notification.setStared(true);
-        repository.save(notification);
-        evictCache(notification.getReceiver());
-    }
-
-    public void unstardMessage(Long id, String userId) {
-        Notification notification = repository.findById(id).orElseThrow(() -> new RuntimeException("Notification not found"));
-        enforceOwnership(notification.getReceiver());
-        notification.setStared(false);
-        repository.save(notification);
-        evictCache(notification.getReceiver());
-    }
-
-    @Transactional
-    public boolean deleteMessage(Long id, String userId) {
-        Notification notification = repository.findById(id).orElseThrow(() -> new RuntimeException("Notification not found"));
-        enforceOwnership(notification.getReceiver());
-        notification.setDeleted(true);
-        repository.save(notification);
-        evictCache(notification.getReceiver());
-        return true;
+        return repository.findByReceiverAndReadFalseAndDeletedFalse(receiver, pageable).getContent();
     }
 
     @Cacheable(value = "getAllNotifications", key = "#receiver + '_' + #page + '_' + #size")
-    @Transactional
+    @Transactional(readOnly = true)
     public List<Notification> getAllNotifications(String receiver, Integer page, Integer size) {
         enforceOwnership(receiver);
         Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
         return repository.findNonChatNotificationsByReceiver(receiver, pageable).getContent();
     }
 
+    // ==================================================================================
+    // UPDATING / ACTIONS (Fixes Applied Here)
+    // ==================================================================================
+
     public void markAsRead(Long id, String userId) {
-        Notification notification = repository.findById(id).orElseThrow(() -> new RuntimeException("Notification not found"));
+        Notification notification = repository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Notification not found"));
         enforceOwnership(notification.getReceiver());
+
         notification.setRead(true);
         repository.save(notification);
-        evictCache(notification.getReceiver());
+
+        // FIX: Manual Call
+        manualEvictUserCache(notification.getReceiver());
     }
 
-    @Cacheable(value = "unreadCount", key = "#receiver")
     @Transactional
-    public Long getUnreadCount(String receiver) {
-        enforceOwnership(receiver);
-        return repository.countNonChatUnreadByReceiver(receiver);
+    public void markAllAsRead(String userId) {
+        enforceOwnership(userId);
+        repository.markAllAsRead(userId);
+        manualEvictUserCache(userId);
     }
 
-    public void evictCache(String receiver) {
-        if ("ALL".equalsIgnoreCase(receiver)) {
-            log.info("Broadcast detected: Clearing notification cache for ALL users.");
+    public void deleteMessage(Long id, String userId) {
+        Notification notification = repository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Notification not found"));
+        enforceOwnership(notification.getReceiver());
 
-            Set<String> countKeys = redisTemplate.keys("unreadCount::*");
-            if (countKeys != null && !countKeys.isEmpty()) redisTemplate.delete(countKeys);
+        notification.setDeleted(true);
+        repository.save(notification);
 
-            Set<String> unreadKeys = redisTemplate.keys("unreadNotifications::*");
+        manualEvictUserCache(notification.getReceiver());
+    }
+
+    @Transactional
+    public void deleteAllMessages(String userId) {
+        enforceOwnership(userId);
+        repository.markAllAsDeleted(userId);
+        manualEvictUserCache(userId);
+    }
+
+    public void stardMessage(Long id, String userId) {
+        Notification notification = repository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Notification not found"));
+        enforceOwnership(notification.getReceiver());
+
+        notification.setStared(true);
+        repository.save(notification);
+        manualEvictUserCache(notification.getReceiver());
+    }
+
+    public void unstardMessage(Long id, String userId) {
+        Notification notification = repository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Notification not found"));
+        enforceOwnership(notification.getReceiver());
+
+        notification.setStared(false);
+        repository.save(notification);
+        manualEvictUserCache(notification.getReceiver());
+    }
+
+    // ==================================================================================
+    // CACHE & SECURITY UTILS
+    // ==================================================================================
+
+    @CacheEvict(value = {"unreadCount", "unreadNotifications", "getAllNotifications"}, allEntries = true)
+    public void evictAllCaches() {
+        log.info("Evicting ALL notification caches.");
+    }
+
+    public void manualEvictUserCache(String receiver) {
+        try {
+            String countKey = "unreadCount::" + receiver;
+            redisTemplate.delete(countKey);
+
+         Set<String> unreadKeys = redisTemplate.keys("unreadNotifications::" + receiver + "_*");
             if (unreadKeys != null && !unreadKeys.isEmpty()) redisTemplate.delete(unreadKeys);
 
-            Set<String> allKeys = redisTemplate.keys("getAllNotifications::*");
+            Set<String> allKeys = redisTemplate.keys("getAllNotifications::" + receiver + "_*");
             if (allKeys != null && !allKeys.isEmpty()) redisTemplate.delete(allKeys);
 
-        } else {
-            Set<String> keys = redisTemplate.keys("getAllNotifications::" + receiver + "_*");
-            if (keys != null && !keys.isEmpty()) redisTemplate.delete(keys);
+            log.info("Cache evicted for user: {}", receiver);
+        } catch (Exception e) {
+            log.error("Failed to evict cache for user {}", receiver, e);
+        }
+    }
 
-            keys = redisTemplate.keys("unreadNotifications::" + receiver + "_*");
-            if (keys != null && !keys.isEmpty()) redisTemplate.delete(keys);
+    private void enforceOwnership(String receiver) {
+        String currentUser = SecurityUtil.getCurrentUserId()
+                .map(String::valueOf)
+                .orElseThrow(() -> new RuntimeException("Unauthorized"));
 
-            keys = redisTemplate.keys("unreadCount::" + receiver + "*");
-            if (keys != null && !keys.isEmpty()) redisTemplate.delete(keys);
+        if (!currentUser.equals(receiver)) {
+            throw new RuntimeException("Forbidden");
         }
     }
 
@@ -164,19 +238,6 @@ public class NotificationService {
         return repository.findByDeletedTrue();
     }
 
-    private void enforceOwnership(String receiver) {
-        String currentUser = SecurityUtil.getCurrentUserId().map(String::valueOf).orElseThrow(() -> new RuntimeException("Unauthorized"));
-
-        if ("ALL".equalsIgnoreCase(receiver)) {
-            return;
-        }
-
-        if (!currentUser.equals(receiver)) {
-            throw new RuntimeException("Forbidden");
-        }
-    }
-
-    @Transactional
     public long getAllCount(String receiver) {
         enforceOwnership(receiver);
         return repository.countNonChatByReceiver(receiver);
