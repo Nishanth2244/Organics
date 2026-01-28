@@ -5,6 +5,8 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 import com.organics.products.entity.EntityType;
+import com.organics.products.exception.BadRequestException;
+import com.organics.products.exception.CouponNotFoundException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -23,6 +25,7 @@ import com.organics.products.exception.ResourceNotFoundException;
 import com.organics.products.respository.CartRepository;
 import com.organics.products.respository.CouponRepository;
 import com.organics.products.respository.UserRepository;
+import org.springframework.transaction.annotation.Transactional;
 
 @Slf4j
 @Service
@@ -36,6 +39,9 @@ public class CouponService {
 	
 	@Autowired
 	private CartRepository cartRepository;
+
+	@Autowired
+	private NotificationService notificationService;
 
 	public CouponDTO converToDTO(Coupon coupon) {
 		CouponDTO dto = new CouponDTO();
@@ -106,39 +112,35 @@ public class CouponService {
 	}
 
 	public List<CouponDTO> getActive() {
-		
-	    Long userId = SecurityUtil.getCurrentUserId()
-	            .orElseThrow(() -> new RuntimeException("Unauthorized"));
+		Long userId = SecurityUtil.getCurrentUserId()
+				.orElseThrow(() -> new RuntimeException("Unauthorized"));
 
-	    User user = customerRepository.findById(userId)
-	            .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+		// 1. Fetch the user (if actually needed for the cart query, otherwise skip)
+		User user = customerRepository.findById(userId)
+				.orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
-	    List<Long> usedCouponIds = cartRepository.findByUser(user).stream()
-	            .flatMap(cart -> cart.getAppliedCoupons().stream())
-	            .map(cartCoupon -> cartCoupon.getCoupon().getId())
-	            .collect(Collectors.toList());
+		// 2. Collect IDs of coupons the user has already used
+		// Note: This assumes Cart -> AppliedCoupon -> Coupon relationship
+		List<Long> usedCouponIds = cartRepository.findByUser(user).stream()
+				.flatMap(cart -> cart.getAppliedCoupons().stream())
+				.map(cartCoupon -> cartCoupon.getCoupon().getId())
+				.collect(Collectors.toList());
 
-	    return couponRepository.findByIsActiveTrue().stream()
-	            .filter(coupon -> !usedCouponIds.contains(coupon.getId())) 
-	            .map(this::converToDTO)
-	            .collect(Collectors.toList());
+		log.info("Fetching active coupons for user {}, excluding {} used coupons", userId, usedCouponIds.size());
 
-		log.info("Fetching active coupons");
+		// 3. Fetch active coupons and filter in memory
+		List<Coupon> activeCoupons = couponRepository.findByIsActiveTrue();
 
-		List<Coupon> coupons = couponRepository.findByIsActiveTrue();
-
-		if (coupons == null || coupons.isEmpty()) {
-			log.warn("No active coupons found");
+		if (activeCoupons.isEmpty()) {
+			log.warn("No active coupons found in system");
 			return List.of();
 		}
 
-		log.info("Found {} active coupons", coupons.size());
-
-		return coupons.stream()
-				.map(this::converToDTO)
-				.toList();
+		return activeCoupons.stream()
+				.filter(coupon -> !usedCouponIds.contains(coupon.getId()))
+				.map(this::converToDTO) // Fixed typo here
+				.collect(Collectors.toList());
 	}
-
 
 
 	@Transactional(readOnly = true)

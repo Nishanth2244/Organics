@@ -75,8 +75,7 @@ public class OrderService {
     @Autowired
     private CouponRepository couponRepository;
     
-    @Autowired
-    private DiscountService discountService;
+
 
 
     @Transactional
@@ -271,36 +270,36 @@ public class OrderService {
                 savedOrder.getId(), savedOrder.getOrderAmount());
 
         // IMPORTANT: Send order to Shiprocket with correct amount
-        try {
-            ShiprocketCreateOrderResponse shiprocketResponse = shiprocketService.createOrder(savedOrder, user, selectedAddress);
-
-            if (shiprocketResponse.getOrderId() != null && shiprocketResponse.getOrderId() > 0) {
-                savedOrder.setShiprocketOrderId(String.valueOf(shiprocketResponse.getOrderId()));
-            }
-            if (shiprocketResponse.getShipmentId() != null) {
-                savedOrder.setShiprocketShipmentId(shiprocketResponse.getShipmentId());
-            }
-            if (shiprocketResponse.getAwbCode() != null) {
-                savedOrder.setShiprocketAwbCode(shiprocketResponse.getAwbCode());
-                savedOrder.setShiprocketTrackingUrl("https://shiprocket.co/tracking/" + shiprocketResponse.getAwbCode());
-            }
-            if (shiprocketResponse.getCourierName() != null) {
-                savedOrder.setShiprocketCourierName(shiprocketResponse.getCourierName());
-            }
-
-            log.info("Shiprocket order created successfully!");
-
-        } catch (Exception e) {
-            log.error("Failed to create Shiprocket order: {}", e.getMessage());
-
-            String errorMessage = e.getMessage();
-            if (errorMessage != null && errorMessage.length() > 200) {
-                errorMessage = errorMessage.substring(0, 200);
-            }
-            savedOrder.setShiprocketOrderId("FAILED: " + errorMessage);
-
-            log.warn("Order saved locally. Shiprocket error: {}", errorMessage);
-        }
+//        try {
+//            ShiprocketCreateOrderResponse shiprocketResponse = shiprocketService.createOrder(savedOrder, user, selectedAddress);
+//
+//            if (shiprocketResponse.getOrderId() != null && shiprocketResponse.getOrderId() > 0) {
+//                savedOrder.setShiprocketOrderId(String.valueOf(shiprocketResponse.getOrderId()));
+//            }
+//            if (shiprocketResponse.getShipmentId() != null) {
+//                savedOrder.setShiprocketShipmentId(shiprocketResponse.getShipmentId());
+//            }
+//            if (shiprocketResponse.getAwbCode() != null) {
+//                savedOrder.setShiprocketAwbCode(shiprocketResponse.getAwbCode());
+//                savedOrder.setShiprocketTrackingUrl("https://shiprocket.co/tracking/" + shiprocketResponse.getAwbCode());
+//            }
+//            if (shiprocketResponse.getCourierName() != null) {
+//                savedOrder.setShiprocketCourierName(shiprocketResponse.getCourierName());
+//            }
+//
+//            log.info("Shiprocket order created successfully!");
+//
+//        } catch (Exception e) {
+//            log.error("Failed to create Shiprocket order: {}", e.getMessage());
+//
+//            String errorMessage = e.getMessage();
+//            if (errorMessage != null && errorMessage.length() > 200) {
+//                errorMessage = errorMessage.substring(0, 200);
+//            }
+//            savedOrder.setShiprocketOrderId("FAILED: " + errorMessage);
+//
+//            log.warn("Order saved locally. Shiprocket error: {}", errorMessage);
+//        }
 
         orderRepository.save(savedOrder);
         return convertToOrderDTO(savedOrder);

@@ -427,11 +427,7 @@ public class ShiprocketService {
         // Shipping same as billing
         request.put("shipping_is_billing", true);
 
-        // Order items
         List<Map<String, Object>> orderItems = new ArrayList<>();
-        double subTotal = 0.0;
-        double totalDiscount = 0.0;
-        double totalTax = 0.0;
 
         for (OrderItems item : order.getOrderItems()) {
             Map<String, Object> orderItem = new HashMap<>();
@@ -439,48 +435,31 @@ public class ShiprocketService {
             orderItem.put("sku", getSku(item.getProduct()));
             orderItem.put("units", item.getQuantity());
 
-            // Get prices from order item
-            double price = item.getPrice() != null ? item.getPrice() : 0.0;
-            double tax = item.getTax() != null ? item.getTax() : 0.0;
-            double discount = item.getDiscount() != null ? item.getDiscount() : 0.0;
-
-            orderItem.put("selling_price", price);
-            orderItem.put("discount", discount);
-            orderItem.put("tax", tax);
+            // Shiprocket Math: ((selling_price * units) + tax) - discount = Total
+            // Ensure item.getPrice() represents the base price per unit
+            orderItem.put("selling_price", item.getPrice());
+            orderItem.put("discount", item.getDiscount() != null ? item.getDiscount() : 0.0);
+            orderItem.put("tax", item.getTax() != null ? item.getTax() : 0.0);
             orderItem.put("hsn", "123456");
 
             orderItems.add(orderItem);
-
-            // Calculate totals
-            double itemTotal = price * item.getQuantity();
-            subTotal += itemTotal;
-            totalTax += tax * item.getQuantity();
-            totalDiscount += discount * item.getQuantity();
-
-            log.info("Shiprocket Item: {} x {} @ {} = {}, Discount: {}, Tax: {}",
-                    item.getProduct().getProductName(), item.getQuantity(), price,
-                    itemTotal, discount, tax);
         }
 
         request.put("order_items", orderItems);
-        request.put("sub_total", subTotal);
-        //request.put("total_discount", totalDiscount);
-
-        // Payment and charges
         request.put("payment_method", "Prepaid");
         request.put("shipping_charges", 0.0);
 
-        // Package dimensions
+        // dimensions
         request.put("length", 10);
         request.put("breadth", 10);
         request.put("height", 10);
-        request.put("weight", 1.0);
+        request.put("weight", 0.5);
 
         log.info("=== Shiprocket Request ===");
         log.info("Order Amount: {}", order.getOrderAmount());
-        log.info("Sub Total: {}", subTotal);
-        log.info("Total Discount: {}", totalDiscount);
-        log.info("Total Tax: {}", totalTax);
+//        log.info("Sub Total: {}", subTotal);
+//        log.info("Total Discount: {}", totalDiscount);
+//        log.info("Total Tax: {}", totalTax);
         log.info("Calculated Total (sub + tax): {}", order.getOrderAmount() );
         log.info("==========================");
 
