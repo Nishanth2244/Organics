@@ -13,14 +13,16 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
+import com.organics.products.config.SecurityUtil;
 import com.organics.products.dto.CouponDTO;
 import com.organics.products.dto.CreateCouponRequest;
 import com.organics.products.entity.Coupon;
 import com.organics.products.entity.DiscountType;
-import com.organics.products.exception.CouponNotFoundException;
-import com.organics.products.exception.BadRequestException;
+import com.organics.products.entity.User;
+import com.organics.products.exception.ResourceNotFoundException;
+import com.organics.products.respository.CartRepository;
 import com.organics.products.respository.CouponRepository;
-import org.springframework.transaction.annotation.Transactional;
+import com.organics.products.respository.UserRepository;
 
 @Slf4j
 @Service
@@ -28,8 +30,12 @@ public class CouponService {
 
 	@Autowired
 	private CouponRepository couponRepository;
+	
 	@Autowired
-	private NotificationService notificationService;
+	private UserRepository customerRepository;
+	
+	@Autowired
+	private CartRepository cartRepository;
 
 	public CouponDTO converToDTO(Coupon coupon) {
 		CouponDTO dto = new CouponDTO();
@@ -99,8 +105,23 @@ public class CouponService {
 
 	}
 
-	@Transactional(readOnly = true)
 	public List<CouponDTO> getActive() {
+		
+	    Long userId = SecurityUtil.getCurrentUserId()
+	            .orElseThrow(() -> new RuntimeException("Unauthorized"));
+
+	    User user = customerRepository.findById(userId)
+	            .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+	    List<Long> usedCouponIds = cartRepository.findByUser(user).stream()
+	            .flatMap(cart -> cart.getAppliedCoupons().stream())
+	            .map(cartCoupon -> cartCoupon.getCoupon().getId())
+	            .collect(Collectors.toList());
+
+	    return couponRepository.findByIsActiveTrue().stream()
+	            .filter(coupon -> !usedCouponIds.contains(coupon.getId())) 
+	            .map(this::converToDTO)
+	            .collect(Collectors.toList());
 
 		log.info("Fetching active coupons");
 

@@ -74,6 +74,9 @@ public class OrderService {
     
     @Autowired
     private CouponRepository couponRepository;
+    
+    @Autowired
+    private DiscountService discountService;
 
 
     @Transactional
@@ -976,21 +979,21 @@ public class OrderService {
         Address selectedAddress = addressRepository.findById(request.getAddressId())
                 .orElseThrow(() -> new ResourceNotFoundException("Address not found"));
 
-// 1. Product MRP and Base Discount Calculation (Product or Category)
+        // 1. Product MRP and Base Discount Calculation (Product or Category)
         Double mrp = product.getMRP();
-
-// discountService use chesi final price (Product/Category discount apply ayyaka) techukuntunnam
+        
+        // discountService use chesi final price (Product/Category discount apply ayyaka) techukuntunnam
         Double discountedUnitPrice = discountService.calculateFinalPrice(product);
         Double productDiscountPerItem = mrp - discountedUnitPrice; // Ee discount already apply ayipoindi
 
-// 2. Subtotal calculation
+        // 2. Subtotal calculation
         Double subTotal = discountedUnitPrice * request.getQuantity();
         Double finalOrderAmount = subTotal;
         Double couponDiscountTotal = 0.0;
-
+        
         log.info("Order amount after item/category discount: {}", finalOrderAmount);
 
-// 3. Coupon Discount Calculation (Max discount limit lekunda)
+        // 3. Coupon Discount Calculation (Max discount limit lekunda)
         if (request.getCouponCode() != null && !request.getCouponCode().isEmpty()) {
             Coupon coupon = couponRepository.findByCode(request.getCouponCode());
 
@@ -1006,7 +1009,7 @@ public class OrderService {
                 throw new RuntimeException("Minimum order amount for this coupon is: " + coupon.getMinOrderAmount());
             }
 
-// Percentage unte motham amount meeda apply chesthunnam (Max amount condition lekunda)
+            // Percentage unte motham amount meeda apply chesthunnam (Max amount condition lekunda)
             if (coupon.getDiscountType() == DiscountType.PERCENT) {
                 couponDiscountTotal = (subTotal * coupon.getDiscountValue()) / 100;
             } else {
@@ -1017,7 +1020,7 @@ public class OrderService {
             log.info("Coupon discount amount: {}", couponDiscountTotal);
         }
 
-// 4. Create Order
+        // 4. Create Order
         Order order = new Order();
         order.setUser(user);
         order.setOrderDate(LocalDate.now());
@@ -1028,7 +1031,7 @@ public class OrderService {
 
         Order savedOrder = orderRepository.save(order);
 
-// 5. Save Order Items
+        // 5. Save Order Items
         OrderItems orderItem = new OrderItems();
         orderItem.setOrder(savedOrder);
         orderItem.setProduct(product);
@@ -1040,7 +1043,7 @@ public class OrderService {
         orderItemsRepository.save(orderItem);
         orderRepository.flush();
 
-// 6. Inventory Reservation
+        // 6. Inventory Reservation
         List<Inventory> inventories = inventoryRepository.findByProductId(product.getId());
         if (!inventories.isEmpty()) {
             inventoryService.reserveStock(inventories.get(0).getId(), request.getQuantity(), savedOrder.getId());

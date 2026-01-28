@@ -39,8 +39,10 @@ public class CouponController {
 
     @GetMapping("/get")
     public List<CouponDTO> getActive() {
-
-        return couponService.getActive();
+        List<CouponDTO> notAppliedCoupons = couponService.getActive();
+        
+        log.info("Fetching Not applied Coupons");
+        return notAppliedCoupons;
     }
 
 

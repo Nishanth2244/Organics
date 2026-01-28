@@ -321,16 +321,17 @@ public class CartService {
 		if (cart.getItems().isEmpty()) {
 			throw new RuntimeException("Cart is empty");
 		}
+		
+		boolean usedBefore = cartRepository.findByUser(user).stream()
+	            .flatMap(c -> c.getAppliedCoupons().stream())
+	            .anyMatch(cc -> cc.getCoupon().getId().equals(couponId));
 
-		boolean alreadyApplied = cart.getAppliedCoupons().stream()
-				.anyMatch(c -> c.getCoupon().getId().equals(couponId));
-
-		if (alreadyApplied) {
-			throw new RuntimeException("Coupon already applied to this cart");
-		}
-
-		Coupon coupon = couponRepository.findById(couponId)
-				.orElseThrow(() -> new ResourceNotFoundException("Coupon not found"));
+	    if (usedBefore) {
+	        throw new RuntimeException("You have already used this coupon once.");
+	    }
+		
+	    Coupon coupon = couponRepository.findById(couponId)
+	            .orElseThrow(() -> new ResourceNotFoundException("Coupon not found"));
 
 		if (!coupon.isActive()) {
 			throw new RuntimeException("Coupon is inactive");
