@@ -101,4 +101,9 @@ GROUP BY c.categoryName
             Pageable pageable);
 
     Page<Order> findByUser(User user, Pageable pageable);
+
+    long countByOrderStatus(OrderStatus orderStatus);
+
+    @Query("SELECT COALESCE(SUM(o.orderAmount), 0) FROM Order o WHERE o.orderStatus = 'DELIVERED'")
+    Double sumTotalDeliveredRevenue();
 }

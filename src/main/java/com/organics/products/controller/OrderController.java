@@ -28,13 +28,13 @@ public class OrderController {
 
     @Autowired
     private OrderService orderService;
-    
-    
+
+
     @Autowired
     private PaymentService paymentService;
-    
-	@Value("${razor.key.id}")
-	private String keyId;
+
+    @Value("${razor.key.id}")
+    private String keyId;
 
     @PostMapping("/place")
     public ResponseEntity<OrderDTO> placeOrder(@RequestBody OrderAddressRequestDTO orderRequest) {
@@ -44,11 +44,8 @@ public class OrderController {
     }
 
     @GetMapping("/my-orders")
-    public ResponseEntity<Page<OrderDTO>> getUserOrders(
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) {
-
-        Page<OrderDTO> orders = orderService.getUserOrders(page, size);
+    public ResponseEntity<List<OrderDTO>> getUserOrders() {
+        List<OrderDTO> orders = orderService.getUserOrders();
         return ResponseEntity.ok(orders);
     }
 
@@ -90,9 +87,14 @@ public class OrderController {
         return ResponseEntity.ok(order);
     }
 
+
     @GetMapping("/admin/all")
-    public ResponseEntity<List<OrderDTO>> getAllOrders() {
-        List<OrderDTO> orders = orderService.getAllOrders();
+
+    public ResponseEntity<Page<OrderDTO>> getAllOrders(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+
+        Page<OrderDTO> orders = orderService.getAllOrders(page, size);
         return ResponseEntity.ok(orders);
     }
 
@@ -172,19 +174,21 @@ public class OrderController {
         List<TopOrderedProductsDTO> topProducts = orderService.getTopOrderedProductsThisMonth();
         return ResponseEntity.ok(topProducts);
     }
-    
-    
+
+
     @PostMapping("/buy-now")
     public OrderResponse buyNow(@Valid @RequestBody BuyNowRequestDTO buyNowRequestDTO) throws RazorpayException {
-    	
-    	OrderDTO localOrder = orderService.buyNowOrder(buyNowRequestDTO);
-    	
-    	OrderResponse orderResponse = paymentService.createOrder(localOrder.getId());
-    	
-    	orderResponse.setKeyId(keyId);    
-    	
-    	log.info("Buy Now Razorpay Order ID: {}", orderResponse.getRazorPayOrderId());
+
+        OrderDTO localOrder = orderService.buyNowOrder(buyNowRequestDTO);
+
+        OrderResponse orderResponse = paymentService.createOrder(localOrder.getId());
+
+        orderResponse.setKeyId(keyId);
+
+        log.info("Buy Now Razorpay Order ID: {}", orderResponse.getRazorPayOrderId());
         return orderResponse;
     }
-    
+
+
+
 }

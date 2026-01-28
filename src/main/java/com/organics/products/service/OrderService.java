@@ -46,8 +46,6 @@ public class OrderService {
 
     @Autowired
     private ProductRepo productRepository;
-    @Autowired
-    private DiscountService discountService;
 
     @Autowired
     private CartItemRepository cartItemRepository;
@@ -68,14 +66,15 @@ public class OrderService {
 
     @Autowired
     private InventoryRepository inventoryRepository;
-    
+
     @Autowired
     private ProductDiscountRepository productDiscountRepository;
-    
+
     @Autowired
     private CouponRepository couponRepository;
-    
 
+    @Autowired
+    private DiscountService discountService;
 
 
     @Transactional
@@ -270,36 +269,36 @@ public class OrderService {
                 savedOrder.getId(), savedOrder.getOrderAmount());
 
         // IMPORTANT: Send order to Shiprocket with correct amount
-//        try {
-//            ShiprocketCreateOrderResponse shiprocketResponse = shiprocketService.createOrder(savedOrder, user, selectedAddress);
-//
-//            if (shiprocketResponse.getOrderId() != null && shiprocketResponse.getOrderId() > 0) {
-//                savedOrder.setShiprocketOrderId(String.valueOf(shiprocketResponse.getOrderId()));
-//            }
-//            if (shiprocketResponse.getShipmentId() != null) {
-//                savedOrder.setShiprocketShipmentId(shiprocketResponse.getShipmentId());
-//            }
-//            if (shiprocketResponse.getAwbCode() != null) {
-//                savedOrder.setShiprocketAwbCode(shiprocketResponse.getAwbCode());
-//                savedOrder.setShiprocketTrackingUrl("https://shiprocket.co/tracking/" + shiprocketResponse.getAwbCode());
-//            }
-//            if (shiprocketResponse.getCourierName() != null) {
-//                savedOrder.setShiprocketCourierName(shiprocketResponse.getCourierName());
-//            }
-//
-//            log.info("Shiprocket order created successfully!");
-//
-//        } catch (Exception e) {
-//            log.error("Failed to create Shiprocket order: {}", e.getMessage());
-//
-//            String errorMessage = e.getMessage();
-//            if (errorMessage != null && errorMessage.length() > 200) {
-//                errorMessage = errorMessage.substring(0, 200);
-//            }
-//            savedOrder.setShiprocketOrderId("FAILED: " + errorMessage);
-//
-//            log.warn("Order saved locally. Shiprocket error: {}", errorMessage);
-//        }
+        try {
+            ShiprocketCreateOrderResponse shiprocketResponse = shiprocketService.createOrder(savedOrder, user, selectedAddress);
+
+            if (shiprocketResponse.getOrderId() != null && shiprocketResponse.getOrderId() > 0) {
+                savedOrder.setShiprocketOrderId(String.valueOf(shiprocketResponse.getOrderId()));
+            }
+            if (shiprocketResponse.getShipmentId() != null) {
+                savedOrder.setShiprocketShipmentId(shiprocketResponse.getShipmentId());
+            }
+            if (shiprocketResponse.getAwbCode() != null) {
+                savedOrder.setShiprocketAwbCode(shiprocketResponse.getAwbCode());
+                savedOrder.setShiprocketTrackingUrl("https://shiprocket.co/tracking/" + shiprocketResponse.getAwbCode());
+            }
+            if (shiprocketResponse.getCourierName() != null) {
+                savedOrder.setShiprocketCourierName(shiprocketResponse.getCourierName());
+            }
+
+            log.info("Shiprocket order created successfully!");
+
+        } catch (Exception e) {
+            log.error("Failed to create Shiprocket order: {}", e.getMessage());
+
+            String errorMessage = e.getMessage();
+            if (errorMessage != null && errorMessage.length() > 200) {
+                errorMessage = errorMessage.substring(0, 200);
+            }
+            savedOrder.setShiprocketOrderId("FAILED: " + errorMessage);
+
+            log.warn("Order saved locally. Shiprocket error: {}", errorMessage);
+        }
 
         orderRepository.save(savedOrder);
         return convertToOrderDTO(savedOrder);
@@ -329,26 +328,19 @@ public class OrderService {
     }
 
     @Transactional(readOnly = true)
-    public Page<OrderDTO> getUserOrders(int page, int size) {
-
+    public List<OrderDTO> getUserOrders() {
         Long userId = SecurityUtil.getCurrentUserId()
                 .orElseThrow(() -> new ResourceNotFoundException("User not authenticated"));
 
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found: " + userId));
 
-        Pageable pageable = PageRequest.of(page, size, Sort.by("orderDate").descending());
+        List<Order> orders = orderRepository.findByUserOrderByOrderDateDesc(user);
 
-        Page<Order> orderPage = orderRepository.findByUser(user, pageable);
-
-        if (orderPage.isEmpty()) {
-            log.info("No orders found for userId={}", userId);
-            return Page.empty(pageable);
-        }
-
-        return orderPage.map(this::convertToOrderDTO);
+        return orders.stream()
+                .map(this::convertToOrderDTO)
+                .collect(Collectors.toList());
     }
-
 
     @Transactional(readOnly = true)
     public OrderDTO getOrderById(Long orderId) {
@@ -366,16 +358,18 @@ public class OrderService {
     }
 
     @Transactional(readOnly = true)
-    public List<OrderDTO> getAllOrders() {
+    public Page<OrderDTO> getAllOrders(int page, int size) {
         if (!SecurityUtil.isAdmin()) {
             throw new RuntimeException("Unauthorized: Admin access required");
         }
 
-        List<Order> orders = orderRepository.findAllByOrderByOrderDateDesc();
+        Pageable pageable = PageRequest.of(page, size, Sort.by("orderDate").descending());
 
-        return orders.stream()
-                .map(this::convertToOrderDTO)
-                .collect(Collectors.toList());
+        Page<Order> orderPage = orderRepository.findAll(pageable);
+
+        // Convert the page of Orders to a page of OrderDTOs
+        // The expensive S3 logic now only runs for 'size' items (e.g., 10), which is fast.
+        return orderPage.map(this::convertToOrderDTO);
     }
 
     @Transactional(readOnly = true)
@@ -633,35 +627,30 @@ public class OrderService {
             throw new RuntimeException("Unauthorized: Admin access required");
         }
 
-        List<Order> allOrders = orderRepository.findAll();
+        // 1. Get total count directly from DB
+        long totalOrders = orderRepository.count();
 
-        long totalOrders = allOrders.size();
-        long pendingOrders = allOrders.stream()
-                .filter(o -> o.getOrderStatus() == OrderStatus.PENDING)
-                .count();
-        long confirmedOrders = allOrders.stream()
-                .filter(o -> o.getOrderStatus() == OrderStatus.CONFIRMED)
-                .count();
-        long shippedOrders = allOrders.stream()
-                .filter(o -> o.getOrderStatus() == OrderStatus.SHIPPED)
-                .count();
-        long deliveredOrders = allOrders.stream()
-                .filter(o -> o.getOrderStatus() == OrderStatus.DELIVERED)
-                .count();
+        // 2. Get status counts using the new repository method
+        long pendingOrders = orderRepository.countByOrderStatus(OrderStatus.PENDING);
+        long confirmedOrders = orderRepository.countByOrderStatus(OrderStatus.CONFIRMED);
+        long shippedOrders = orderRepository.countByOrderStatus(OrderStatus.SHIPPED);
+        long deliveredOrders = orderRepository.countByOrderStatus(OrderStatus.DELIVERED);
 
-        double totalRevenue = allOrders.stream()
-                .filter(o -> o.getOrderStatus() == OrderStatus.DELIVERED)
-                .mapToDouble(Order::getOrderAmount)
-                .sum();
+        Double totalRevenue = orderRepository.sumTotalDeliveredRevenue();
 
-        return Map.of(
-                "totalOrders", totalOrders,
-                "pendingOrders", pendingOrders,
-                "confirmedOrders", confirmedOrders,
-                "shippedOrders", shippedOrders,
-                "deliveredOrders", deliveredOrders,
-                "totalRevenue", totalRevenue
-        );
+        Map<String, Object> response = new HashMap<>();
+        response.put("totalOrders", totalOrders);
+        response.put("totalRevenue", totalRevenue);
+
+        response.put("total confirmed", confirmedOrders);
+        response.put("total shipped", shippedOrders);
+
+        response.put("pendingOrders", pendingOrders);
+        response.put("confirmedOrders", confirmedOrders);
+        response.put("shippedOrders", shippedOrders);
+        response.put("deliveredOrders", deliveredOrders);
+
+        return response;
     }
 
 
@@ -889,8 +878,8 @@ public class OrderService {
 
         return shiprocketService.checkServiceability(pickupAddress, deliveryAddress, 1.0);
     }
-    
-    
+
+
     @Transactional
     public void sendOrderToShiprocket(Long orderId) {
         Order order = orderRepository.findById(orderId)
@@ -898,7 +887,7 @@ public class OrderService {
 
         try {
             ShiprocketCreateOrderResponse shiprocketResponse = shiprocketService.createOrder(order, order.getUser(), order.getShippingAddress());
-            
+
             if (shiprocketResponse.getOrderId() != null && shiprocketResponse.getOrderId() > 0) {
                 order.setShiprocketOrderId(String.valueOf(shiprocketResponse.getOrderId()));
                 order.setShiprocketShipmentId(shiprocketResponse.getShipmentId());
@@ -980,7 +969,7 @@ public class OrderService {
 
         // 1. Product MRP and Base Discount Calculation (Product or Category)
         Double mrp = product.getMRP();
-        
+
         // discountService use chesi final price (Product/Category discount apply ayyaka) techukuntunnam
         Double discountedUnitPrice = discountService.calculateFinalPrice(product);
         Double productDiscountPerItem = mrp - discountedUnitPrice; // Ee discount already apply ayipoindi
@@ -989,7 +978,7 @@ public class OrderService {
         Double subTotal = discountedUnitPrice * request.getQuantity();
         Double finalOrderAmount = subTotal;
         Double couponDiscountTotal = 0.0;
-        
+
         log.info("Order amount after item/category discount: {}", finalOrderAmount);
 
         // 3. Coupon Discount Calculation (Max discount limit lekunda)
