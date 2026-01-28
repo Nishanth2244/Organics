@@ -28,13 +28,16 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
 
     List<Order> findByOrderDateOrderByOrderDateDesc(LocalDate date);
 
-    @Query("SELECT o.orderDate, COUNT(o), SUM(o.orderAmount), " +
+    @Query("SELECT o.orderDate, " +
+            "COUNT(o), " +
+            "SUM(CASE WHEN o.orderStatus = 'DELIVERED' THEN o.orderAmount ELSE 0.0 END), " +
             "SUM(CASE WHEN o.orderStatus = 'PENDING' THEN 1 ELSE 0 END), " +
-            "SUM(CASE WHEN o.orderStatus = 'DELIVERED' THEN 1 ELSE 0 END) " +
+            "SUM(CASE WHEN o.orderStatus = 'DELIVERED' THEN 1 ELSE 0 END), " +
+            "SUM(CASE WHEN o.orderStatus = 'CONFIRMED' THEN 1 ELSE 0 END), " +
+            "SUM(CASE WHEN o.orderStatus = 'SHIPPED' THEN 1 ELSE 0 END) " +
             "FROM Order o " +
             "WHERE o.orderDate BETWEEN :startDate AND :endDate " +
-            "GROUP BY o.orderDate " +
-            "ORDER BY o.orderDate")
+            "GROUP BY o.orderDate")
     List<Object[]> getDailyOrderStats(@Param("startDate") LocalDate startDate,
                                       @Param("endDate") LocalDate endDate);
 

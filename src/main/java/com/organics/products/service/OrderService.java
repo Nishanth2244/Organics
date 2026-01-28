@@ -627,30 +627,35 @@ public class OrderService {
             throw new RuntimeException("Unauthorized: Admin access required");
         }
 
-        // 1. Get total count directly from DB
-        long totalOrders = orderRepository.count();
+        List<Order> allOrders = orderRepository.findAll();
 
-        // 2. Get status counts using the new repository method
-        long pendingOrders = orderRepository.countByOrderStatus(OrderStatus.PENDING);
-        long confirmedOrders = orderRepository.countByOrderStatus(OrderStatus.CONFIRMED);
-        long shippedOrders = orderRepository.countByOrderStatus(OrderStatus.SHIPPED);
-        long deliveredOrders = orderRepository.countByOrderStatus(OrderStatus.DELIVERED);
+        long totalOrders = allOrders.size();
+        long pendingOrders = allOrders.stream()
+                .filter(o -> o.getOrderStatus() == OrderStatus.PENDING)
+                .count();
+        long confirmedOrders = allOrders.stream()
+                .filter(o -> o.getOrderStatus() == OrderStatus.CONFIRMED)
+                .count();
+        long shippedOrders = allOrders.stream()
+                .filter(o -> o.getOrderStatus() == OrderStatus.SHIPPED)
+                .count();
+        long deliveredOrders = allOrders.stream()
+                .filter(o -> o.getOrderStatus() == OrderStatus.DELIVERED)
+                .count();
 
-        Double totalRevenue = orderRepository.sumTotalDeliveredRevenue();
+        double totalRevenue = allOrders.stream()
+                .filter(o -> o.getOrderStatus() == OrderStatus.DELIVERED)
+                .mapToDouble(Order::getOrderAmount)
+                .sum();
 
-        Map<String, Object> response = new HashMap<>();
-        response.put("totalOrders", totalOrders);
-        response.put("totalRevenue", totalRevenue);
-
-        response.put("total confirmed", confirmedOrders);
-        response.put("total shipped", shippedOrders);
-
-        response.put("pendingOrders", pendingOrders);
-        response.put("confirmedOrders", confirmedOrders);
-        response.put("shippedOrders", shippedOrders);
-        response.put("deliveredOrders", deliveredOrders);
-
-        return response;
+        return Map.of(
+                "totalOrders", totalOrders,
+                "pendingOrders", pendingOrders,
+                "confirmedOrders", confirmedOrders,
+                "shippedOrders", shippedOrders,
+                "deliveredOrders", deliveredOrders,
+                "totalRevenue", totalRevenue
+        );
     }
 
 
@@ -696,6 +701,9 @@ public class OrderService {
             dailyStat.setPendingOrders((Long) data[3]);
             dailyStat.setDeliveredOrders((Long) data[4]);
 
+            dailyStat.setConfirmedOrders((Long) data[5]);
+            dailyStat.setShippedOrders((Long) data[6]);
+
             if (dailyStat.getTotalOrders() > 0) {
                 dailyStat.setAverageOrderValue(dailyStat.getTotalRevenue() / dailyStat.getTotalOrders());
             } else {
@@ -704,6 +712,7 @@ public class OrderService {
 
             stats.add(dailyStat);
         }
+
         List<LocalDate> allDates = startDate.datesUntil(endDate.plusDays(1)).collect(Collectors.toList());
         for (LocalDate date : allDates) {
             boolean dateExists = stats.stream().anyMatch(stat -> stat.getDate().equals(date));
@@ -714,6 +723,10 @@ public class OrderService {
                 zeroStat.setTotalRevenue(0.0);
                 zeroStat.setPendingOrders(0L);
                 zeroStat.setDeliveredOrders(0L);
+
+                zeroStat.setConfirmedOrders(0L);
+                zeroStat.setShippedOrders(0L);
+
                 zeroStat.setAverageOrderValue(0.0);
                 stats.add(zeroStat);
             }

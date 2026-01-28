@@ -11,5 +11,8 @@ public class DailyOrderStatsDTO {
     private Double totalRevenue;
     private Long pendingOrders;
     private Long deliveredOrders;
+    private Long confirmedOrders;
+    private Long shippedOrders;
     private Double averageOrderValue;
+
 }
