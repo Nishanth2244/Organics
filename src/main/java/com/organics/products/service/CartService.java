@@ -289,11 +289,12 @@ public class CartService {
 			throw new RuntimeException("Cart is empty");
 		}
 		
-		boolean alreadyApplied = cart.getAppliedCoupons().stream()
-	            .anyMatch(c -> c.getCoupon().getId().equals(couponId));
-	    
-	    if (alreadyApplied) {
-	        throw new RuntimeException("Coupon already applied to this cart");
+		boolean usedBefore = cartRepository.findByUser(user).stream()
+	            .flatMap(c -> c.getAppliedCoupons().stream())
+	            .anyMatch(cc -> cc.getCoupon().getId().equals(couponId));
+
+	    if (usedBefore) {
+	        throw new RuntimeException("You have already used this coupon once.");
 	    }
 		
 	    Coupon coupon = couponRepository.findById(couponId)

@@ -29,4 +29,6 @@ public interface CartRepository extends JpaRepository<Cart, Long>{
             "LEFT JOIN FETCH i.inventory inv " +
             "WHERE c.user.id = :userId AND c.isActive = true")
     Optional<Cart> findByIdWithItemsAndUser(@Param("userId") Long userId);
+    
+    List<Cart> findByUser(User user);
 }
