@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import com.organics.products.dto.ImageDetailDTO;
 import com.organics.products.entity.*;
 import com.organics.products.exception.ProductNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -61,12 +62,21 @@ public class ProductService {
 			dto.setCategoryId(product.getCategory().getId());
 		}
 
+//		if (product.getImages() != null) {
+//			List<String> urls = product.getImages()
+//					.stream()
+//					.map(img -> s3Service.getFileUrl(img.getImageUrl()))
+//					.collect(Collectors.toList());
+//			dto.setImageUrls(urls);
+//		}
 		if (product.getImages() != null) {
-			List<String> urls = product.getImages()
-					.stream()
-					.map(img -> s3Service.getFileUrl(img.getImageUrl()))
-					.collect(Collectors.toList());
-			dto.setImageUrls(urls);
+			List<ImageDetailDTO> imageDetails = product.getImages().stream().map(img -> {
+				ImageDetailDTO detail = new ImageDetailDTO();
+				detail.setId(img.getId());
+				detail.setUrl(s3Service.getFileUrl(img.getImageUrl()));
+				return detail;
+			}).collect(Collectors.toList());
+			dto.setImageUrls(imageDetails);
 		}
 
 		List<Inventory> inventories =

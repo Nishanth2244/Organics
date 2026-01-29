@@ -18,7 +18,7 @@ public class ProductDTO {
     private Long categoryId;
     private UnitType unit;
     private Double netWeight;
-    private List<String> imageUrls;
+    private List<ImageDetailDTO> imageUrls;
     private Long inventoryId;
     private Integer availableStock;
 

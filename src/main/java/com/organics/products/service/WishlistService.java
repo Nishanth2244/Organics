@@ -1,6 +1,7 @@
 package com.organics.products.service;
 
 import com.organics.products.config.SecurityUtil;
+import com.organics.products.dto.ImageDetailDTO;
 import com.organics.products.dto.ProductDTO;
 import com.organics.products.entity.*;
 import com.organics.products.exception.BadRequestException;
@@ -150,12 +151,11 @@ public class WishlistService {
             r.setCategoryId(product.getCategory().getId());
         }
 
+        // Inventory handling
         List<Inventory> inventories = inventoryRepository.findByProductId(product.getId());
         if (inventories != null && !inventories.isEmpty()) {
-
             Inventory inv = inventories.get(0);
             r.setInventoryId(inv.getId());
-
             int totalStock = inventories.stream()
                     .mapToInt(i -> i.getAvailableStock() != null ? i.getAvailableStock() : 0)
                     .sum();
@@ -166,20 +166,22 @@ public class WishlistService {
         }
 
         if (product.getImages() != null) {
-            r.setImageUrls(
-                    product.getImages()
-                            .stream()
-                            .map(img -> s3Service.getFileUrl(img.getImageUrl()))
-                            .toList()
-            );
+            List<ImageDetailDTO> imageDetails = product.getImages().stream().map(img -> {
+                ImageDetailDTO detail = new ImageDetailDTO();
+                detail.setId(img.getId()); // Database ID ikkada set chesthunnam
+                detail.setUrl(s3Service.getFileUrl(img.getImageUrl())); // S3 URL ikkada set chesthunnam
+                return detail;
+            }).toList();
+
+            r.setImageUrls(imageDetails); // Meeru DTO lo 'images' ani field update chesi unte idi set cheyandi
         }
 
+        // Discount handling
         Double finalPrice = discountService.calculateFinalPrice(product);
         r.setFinalPrice(finalPrice);
 
         if (finalPrice < product.getMRP()) {
             r.setDiscountAmount(product.getMRP() - finalPrice);
-
             Discount discount = discountService.getApplicableDiscount(product);
             if (discount != null) {
                 r.setDiscountType(discount.getDiscountType());
