@@ -11,7 +11,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 @Slf4j
-@Component
+//@Component
 public class DiscountExpiryScheduler {
 
     private final DiscountRepository discountRepository;

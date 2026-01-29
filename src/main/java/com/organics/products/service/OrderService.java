@@ -73,6 +73,9 @@ public class OrderService {
     @Autowired
     private CouponRepository couponRepository;
 
+    @Autowired
+    private TaxService taxService;
+
 
     @Transactional
     public OrderDTO placeOrder(OrderAddressRequestDTO orderRequest) {
@@ -186,14 +189,33 @@ public class OrderService {
                 itemDiscount = (itemMrpValue / totalCartMrp) * cartDiscount;
             }
 
+
+
             // Calculate selling price (total price for this item's quantity)
             double itemTotalPrice = itemMrpValue - itemDiscount;
 
             // Calculate price per unit
             double pricePerUnit = itemTotalPrice / cartItem.getQuantity();
 
-            // Calculate tax for the total item price
-            double itemTax = itemTotalPrice * 0.05;
+
+            //Tax Calculation here
+            Long categoryId = product.getCategory().getId();
+            double taxPercent = taxService.getTaxPercentByCategoryId(categoryId);
+            double itemTax = itemTotalPrice * taxPercent / 100;
+
+            orderItem.setPrice(pricePerUnit);
+            orderItem.setDiscount(itemDiscount / cartItem.getQuantity());
+            orderItem.setTax(itemTax / cartItem.getQuantity());  // tax per unit
+
+            orderItemsList.add(orderItem);
+
+            // Update totals
+            calculatedTotal += itemTotalPrice + itemTax;
+            calculatedTotalTax += itemTax;
+            calculatedTotalDiscount += itemDiscount;
+
+
+
 
             orderItem.setPrice(pricePerUnit); // Price per unit
             orderItem.setDiscount(itemDiscount / cartItem.getQuantity()); // Discount per unit
@@ -216,6 +238,8 @@ public class OrderService {
             log.info("Item Tax: {}", itemTax);
             log.info("Item Total (price + tax): {}", itemTotalPrice + itemTax);
         }
+
+
 
         if (orderItemsList.isEmpty()) {
             throw new RuntimeException("No valid items to create order.");
@@ -507,7 +531,9 @@ public class OrderService {
         dto.setOrderAmount(order.getOrderAmount());
         dto.setDescription(order.getDescription());
         dto.setOrderStatus(order.getOrderStatus());
-        dto.setPaymentStatus(dto.getPaymentStatus());
+        //dto.setPaymentStatus(dto.getPaymentStatus());
+        dto.setPaymentStatus(String.valueOf(order.getPaymentStatus()));  // ok
+
         dto.setUserId(order.getUser().getId());
 
         User user = order.getUser();
@@ -618,7 +644,7 @@ public class OrderService {
         dto.setItemDiscount(orderItemDiscount);
         dto.setCartDiscount(totalCartDiscount);
         dto.setTotalDiscount(totalCartDiscount);
-        dto.setGrandTotal(order.getOrderAmount());
+        dto.setGrandTotal(order.getOrderAmount() + orderTax );
 
         return dto;
     }
@@ -1045,7 +1071,17 @@ public class OrderService {
 
         orderItem.setPrice(discountedUnitPrice);
         orderItem.setDiscount(productDiscountPerItem);
-        orderItem.setTax(mrp * 0.05);
+        //orderItem.setTax(mrp * 0.05);
+
+        Long categoryId = product.getCategory().getId();
+        double taxPercent = taxService.getTaxPercentByCategoryId(categoryId);
+        double totalPrice = discountedUnitPrice * request.getQuantity();
+        double taxAmount = totalPrice * taxPercent / 100;
+
+
+        orderItem.setTax(taxAmount);
+        orderItem.setTax(taxAmount);
+
 
         orderItemsRepository.save(orderItem);
 

@@ -102,8 +102,6 @@ public class ProductController {
 	    return productService.updateProduct(id, images, productName, brand, description, returnDays, mrp, categoryId, unitType, netWeight);
 	}
 
-
-
 	@GetMapping("/byCategory")
 	public ResponseEntity<Page<ProductDTO>> byCategory(
 			@RequestParam Long categoryId,

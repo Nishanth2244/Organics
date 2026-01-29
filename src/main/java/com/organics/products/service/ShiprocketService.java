@@ -481,7 +481,7 @@ public class ShiprocketService {
         log.info("Sub Total: {}", subTotal);
         log.info("Total Discount: {}", totalDiscount);
         log.info("Total Tax: {}", totalTax);
-        log.info("Calculated Total (sub + tax): {}", subTotal );
+        log.info("Calculated  Grand Total (sub + tax): {}", subTotal + totalTax );
         log.info("==========================");
 
         return request;
