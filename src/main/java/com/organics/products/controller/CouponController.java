@@ -54,7 +54,6 @@ public class CouponController {
     }
 
 
-
     @PutMapping("/status/{id}")
     public String updateStatus(@PathVariable Long id, @RequestParam Boolean status) {
         couponService.setStatus(status, id);

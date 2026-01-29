@@ -20,7 +20,7 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
 
     List<Order> findByUserOrderByOrderDateDesc(User user);
 
-    Page<Order> findByUserId(Long userId,Pageable pageable);
+    Page<Order> findByUserId(Long userId, Pageable pageable);
 
     List<Order> findByOrderStatusOrderByOrderDateDesc(OrderStatus status);
 
@@ -44,7 +44,6 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     @Query("SELECT COALESCE(SUM(o.orderAmount), 0) FROM Order o WHERE o.orderDate = :date")
     Double sumOrderAmountByDate(@Param("date") LocalDate date);
 
-    // Count queries for date range
     Long countByOrderDateBetween(LocalDate startDate, LocalDate endDate);
 
     Long countByOrderDate(LocalDate date);
@@ -83,21 +82,32 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     @Query("SELECT SUM(o.orderAmount) FROM Order o WHERE o.orderStatus = :status AND o.orderDate >= :startDate")
     Double getRevenueByStatusAndDate(@Param("status") OrderStatus status, @Param("startDate") LocalDate startDate);
 
-    @Query("""
+    @Query(value = """
 
             SELECT new com.organics.products.dto.CategoryRevenueDTO(
-    c.categoryName,
-    SUM(oi.price * oi.quantity)
-)
-FROM Order o
-JOIN o.orderItems oi
-JOIN oi.product p
-JOIN p.category c
-WHERE MONTH(o.orderDate) = :month
-  AND YEAR(o.orderDate) = :year
-  AND o.orderStatus = 'DELIVERED'
-GROUP BY c.categoryName
-""")
+            c.categoryName,
+            SUM(oi.price * oi.quantity)
+        )
+        FROM Order o
+        JOIN o.orderItems oi
+        JOIN oi.product p
+        JOIN p.category c
+        WHERE MONTH(o.orderDate) = :month
+          AND YEAR(o.orderDate) = :year
+          AND o.orderStatus = 'DELIVERED'
+        GROUP BY c.categoryName
+        ORDER BY SUM(oi.price * oi.quantity) DESC
+        """,
+            countQuery = """
+        SELECT COUNT(DISTINCT c.categoryName)
+        FROM Order o
+        JOIN o.orderItems oi
+        JOIN oi.product p
+        JOIN p.category c
+        WHERE MONTH(o.orderDate) = :month
+          AND YEAR(o.orderDate) = :year
+          AND o.orderStatus = 'DELIVERED'
+        """)
     Page<CategoryRevenueDTO> getCategoryRevenueByMonth(
             @Param("month") int month,
             @Param("year") int year,
@@ -109,4 +119,10 @@ GROUP BY c.categoryName
 
     @Query("SELECT COALESCE(SUM(o.orderAmount), 0) FROM Order o WHERE o.orderStatus = 'DELIVERED'")
     Double sumTotalDeliveredRevenue();
-}
+
+    @Query("SELECT DISTINCT cc.coupon.id FROM Order o " +
+            "JOIN o.cart c " +
+            "JOIN c.appliedCoupons cc " +
+            "WHERE o.user.id = :userId")
+    List<Long> findUsedCouponIdsByUserId(@Param("userId") Long userId);}
+

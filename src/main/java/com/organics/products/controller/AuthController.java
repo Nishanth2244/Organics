@@ -1,6 +1,8 @@
 package com.organics.products.controller;
 
 import com.organics.products.dto.CreateAdminRequest;
+import com.organics.products.dto.LoginRequestDto;
+import com.organics.products.dto.LoginResponseDto;
 import com.organics.products.dto.TokenPair;
 import com.organics.products.service.AuthService;
 import jakarta.servlet.http.Cookie;
@@ -123,25 +125,26 @@ public class AuthController {
     }
 
     @PostMapping("/admin/login")
-    public ResponseEntity<?> adminLogin(
-            @RequestParam String email,
-            @RequestParam String password,
+    public ResponseEntity<LoginResponseDto> adminLogin(
+            @RequestBody LoginRequestDto loginDto,
             HttpServletResponse response
     ) {
-        TokenPair tokenPair = authService.adminLogin(email, password);
+        TokenPair tokenPair =
+                authService.adminLogin(loginDto.getEmail(), loginDto.getPassword());
 
         Cookie cookie = new Cookie("refreshToken", tokenPair.getRefreshToken());
         cookie.setHttpOnly(true);
-        cookie.setSecure(true); // true in PROD (HTTPS)
+        cookie.setSecure(true);
         cookie.setPath("/");
         cookie.setMaxAge((int) (refreshTokenExpiryMs / 1000));
 
         response.addCookie(cookie);
 
         return ResponseEntity.ok(
-                Map.of("accessToken", tokenPair.getAccessToken())
+                new LoginResponseDto(tokenPair.getAccessToken())
         );
     }
+
 
     @PreAuthorize("hasAnyRole('ADMIN')")
     @PostMapping("/admin/change-password")

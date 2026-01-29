@@ -1,12 +1,15 @@
 package com.organics.products.service;
 
 import java.time.LocalDate;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import com.organics.products.entity.EntityType;
 import com.organics.products.exception.BadRequestException;
 import com.organics.products.exception.CouponNotFoundException;
+import com.organics.products.respository.OrderRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -42,6 +45,9 @@ public class CouponService {
 
 	@Autowired
 	private NotificationService notificationService;
+
+	@Autowired
+	private OrderRepository orderRepository;
 
 	public CouponDTO converToDTO(Coupon coupon) {
 		CouponDTO dto = new CouponDTO();
@@ -110,35 +116,30 @@ public class CouponService {
 		return converToDTO(saved);
 
 	}
-
 	public List<CouponDTO> getActive() {
 		Long userId = SecurityUtil.getCurrentUserId()
 				.orElseThrow(() -> new RuntimeException("Unauthorized"));
 
-		// 1. Fetch the user (if actually needed for the cart query, otherwise skip)
 		User user = customerRepository.findById(userId)
 				.orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
-		// 2. Collect IDs of coupons the user has already used
-		// Note: This assumes Cart -> AppliedCoupon -> Coupon relationship
-		List<Long> usedCouponIds = cartRepository.findByUser(user).stream()
+		// 1. Orders nundi use chesina coupon IDs techukovali
+		List<Long> usedInOrders = orderRepository.findUsedCouponIdsByUserId(userId);
+
+		// 2. Ippudu active ga unna cart nundi kuda check cheyali (redundancy kosam)
+		List<Long> usedInCarts = cartRepository.findByUser(user).stream()
 				.flatMap(cart -> cart.getAppliedCoupons().stream())
 				.map(cartCoupon -> cartCoupon.getCoupon().getId())
 				.collect(Collectors.toList());
 
-		log.info("Fetching active coupons for user {}, excluding {} used coupons", userId, usedCouponIds.size());
+		// Rendu list lani okkati cheyali
+		Set<Long> allUsedCouponIds = new HashSet<>(usedInOrders);
+		allUsedCouponIds.addAll(usedInCarts);
 
-		// 3. Fetch active coupons and filter in memory
-		List<Coupon> activeCoupons = couponRepository.findByIsActiveTrue();
-
-		if (activeCoupons.isEmpty()) {
-			log.warn("No active coupons found in system");
-			return List.of();
-		}
-
-		return activeCoupons.stream()
-				.filter(coupon -> !usedCouponIds.contains(coupon.getId()))
-				.map(this::converToDTO) // Fixed typo here
+		// Filter chesi return cheyali
+		return couponRepository.findByIsActiveTrue().stream()
+				.filter(coupon -> !allUsedCouponIds.contains(coupon.getId()))
+				.map(this::converToDTO)
 				.collect(Collectors.toList());
 	}
 

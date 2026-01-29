@@ -211,7 +211,7 @@ public class CategoryService {
 	public Page<CategoryRevenueDTO> getCategoryRevenueByMonth(
 			int page, int size, int month, int year) {
 
-		Pageable pageable = PageRequest.of(page, size, Sort.by("totalRevenue").descending());
+		Pageable pageable = PageRequest.of(page, size);
 
 		return orderRepository.getCategoryRevenueByMonth(month, year, pageable);
 	}

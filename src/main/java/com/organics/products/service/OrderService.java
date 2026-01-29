@@ -109,7 +109,6 @@ public class OrderService {
             throw new RuntimeException("Cart is empty. Cannot place order.");
         }
 
-        // Get cart details
         Double cartDiscount = activeCart.getDiscountAmount() != null ? activeCart.getDiscountAmount() : 0.0;
         Double cartPayableAmount = activeCart.getPayableAmount();
         Double cartSubtotal = activeCart.getPayableAmount() != null ? activeCart.getPayableAmount() : 0.0;

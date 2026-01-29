@@ -336,7 +336,7 @@ public class ShiprocketService {
         request.put("order_id", uniqueOrderId);
         request.put("order_date", order.getOrderDate().toString());
 
-        // Send the actual order amount (620 in your case)
+        // Send the actual order amount (final payable amount from DB)
         request.put("order_amount", order.getOrderAmount());
         request.put("comment", order.getDescription() != null ?
                 order.getDescription() : "Organic Products Order");
@@ -344,7 +344,6 @@ public class ShiprocketService {
         // Customer details
         String firstName = user.getFirstName() != null ? user.getFirstName() : "";
         String lastName = user.getLastName() != null ? user.getLastName() : "Customer";
-
         if (firstName.isEmpty() && lastName.equals("Customer")) {
             firstName = "Customer";
         }
@@ -363,23 +362,26 @@ public class ShiprocketService {
         // Shipping same as billing
         request.put("shipping_is_billing", true);
 
-        List<Map<String, Object>> orderItems = new ArrayList<>();
-
+        // Calculate sub_total for all items first to fix the 422 error
         double subTotal = order.getOrderItems().stream()
                 .mapToDouble(item -> item.getPrice() * item.getQuantity())
                 .sum();
 
+        // Add sub_total as a TOP-LEVEL field
+        request.put("sub_total", subTotal);
+
+        List<Map<String, Object>> orderItems = new ArrayList<>();
         for (OrderItems item : order.getOrderItems()) {
             Map<String, Object> orderItem = new HashMap<>();
             orderItem.put("name", item.getProduct().getProductName());
             orderItem.put("sku", getSku(item.getProduct()));
             orderItem.put("units", item.getQuantity());
 
-            // Shiprocket Math: ((selling_price * units) + tax) - discount = Total
-            // Ensure item.getPrice() represents the base price per unit
+            // price is already discounted per unit in OrderService
             orderItem.put("selling_price", item.getPrice());
-            request.put("sub_total", subTotal);
-            orderItem.put("discount", item.getDiscount() != null ? item.getDiscount() : 0.0);
+
+            // Discount is set to 0 here because it's already subtracted from selling_price
+            orderItem.put("discount", 0.0);
             orderItem.put("tax", item.getTax() != null ? item.getTax() : 0.0);
             orderItem.put("hsn", "123456");
 
@@ -390,23 +392,20 @@ public class ShiprocketService {
         request.put("payment_method", "Prepaid");
         request.put("shipping_charges", 0.0);
 
-        // dimensions
+        // Default package dimensions
         request.put("length", 10);
         request.put("breadth", 10);
         request.put("height", 10);
         request.put("weight", 0.5);
 
-        log.info("=== Shiprocket Request ===");
-        log.info("Order Amount: {}", order.getOrderAmount());
-//        log.info("Sub Total: {}", subTotal);
-//        log.info("Total Discount: {}", totalDiscount);
-//        log.info("Total Tax: {}", totalTax);
-        log.info("Calculated Total (sub + tax): {}", order.getOrderAmount() );
-        log.info("==========================");
+        log.info("=== Shiprocket Request Summary ===");
+        log.info("Order ID: {}", uniqueOrderId);
+        log.info("Sub Total (Top Level): {}", subTotal);
+        log.info("Final Order Amount: {}", order.getOrderAmount());
+        log.info("==================================");
 
         return request;
     }
-
     private double calculateTotalDiscount(Order order) {
         return order.getOrderItems().stream()
                 .mapToDouble(item -> item.getDiscount() != null ? item.getDiscount() : 0.0)
