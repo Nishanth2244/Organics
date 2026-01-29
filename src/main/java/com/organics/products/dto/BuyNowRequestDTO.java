@@ -25,5 +25,6 @@ public class BuyNowRequestDTO {
     private String couponCode; 
 
     @Schema(requiredMode = Schema.RequiredMode.NOT_REQUIRED)
-    private String description; 
+    private String description;
+
 }

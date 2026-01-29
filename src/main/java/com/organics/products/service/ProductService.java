@@ -202,8 +202,9 @@ public class ProductService {
 		return products.map(this::convertToDTO);
 	}
 
-	public ProductDTO updateProduct(Long id, MultipartFile[] images, String productName, String brand, String description,
-									Integer returnDays, Double mrp, Long categoryId, UnitType unitType, Double netWeight) throws IOException {
+	public ProductDTO updateProduct(Long id, MultipartFile[] images, String productName, String brand,
+									String description, Integer returnDays, Double mrp, Long categoryId, UnitType unitType, Double netWeight)
+			throws IOException {
 
 		Product product = productRepo.findById(id)
 				.orElseThrow(() -> new ResourceNotFoundException("Product not found with id: " + id));
@@ -219,14 +220,13 @@ public class ProductService {
 		if (mrp != null)
 			product.setMRP(mrp);
 
-		if(unitType != null) {
+		if (unitType != null) {
 			product.setUnit(unitType);
 		}
 
-		if(netWeight != null) {
+		if (netWeight != null) {
 			product.setNetWeight(netWeight);
 		}
-
 
 		if (categoryId != null) {
 			Category category = categoryRepo.findById(categoryId)
@@ -235,13 +235,8 @@ public class ProductService {
 		}
 
 		if (images != null && images.length > 0) {
-			if (product.getImages() != null) {
-				for (ProductImage oldImg : product.getImages()) {
-					s3Service.deleteFile(oldImg.getImageUrl());
-				}
 
-				product.getImages().clear();
-			} else {
+			if (product.getImages() == null) {
 				product.setImages(new ArrayList<>());
 			}
 

@@ -184,6 +184,7 @@ public class OrderController {
         OrderResponse orderResponse = paymentService.createOrder(localOrder.getId());
 
         orderResponse.setKeyId(keyId);
+        orderResponse.setOrderId(localOrder.getId());
 
         log.info("Buy Now Razorpay Order ID: {}", orderResponse.getRazorPayOrderId());
         return orderResponse;

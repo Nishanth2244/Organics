@@ -8,20 +8,16 @@ import com.organics.products.respository.NotificationRepository;
 import com.organics.products.respository.UserRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.cache.annotation.CacheEvict;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
-import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -35,14 +31,11 @@ public class NotificationService {
     private UserRepository userRepository;
 
     @Autowired
-    private NotificationProducer producer;
+    private NotificationPushService notificationPushService;
 
     @Autowired
-    private RedisTemplate<String, Object> redisTemplate; // Re-introduced for manual eviction
+    private PushNotificationService pushNotificationService;
 
-    // ==================================================================================
-    // SENDING LOGIC
-    // ==================================================================================
 
     public void sendNotification(String receiver, String message, String sender, String type,
                                  String link, String category, String kind, String subject,
@@ -66,8 +59,9 @@ public class NotificationService {
     @Async("notificationExecutor")
     public void sendSingleNotificationAsync(Notification notification) {
         repository.save(notification);
-        manualEvictUserCache(notification.getReceiver()); // Manual Eviction
-        producer.sendNotification(notification);
+
+        notificationPushService.sendNotificationToUser(notification.getReceiver(), notification);
+        handleMobilePush(notification);
     }
 
     @Async("notificationExecutor")
@@ -106,22 +100,37 @@ public class NotificationService {
             page++;
         } while (userPage.hasNext());
 
-        evictAllCaches(); // Clear global cache
         baseData.setReceiver("ALL");
-        producer.sendNotification(baseData);
+        notificationPushService.sendNotificationToUser("ALL", baseData);
+        handleMobilePush(baseData);
     }
 
-    // ==================================================================================
-    // FETCHING LOGIC
-    // ==================================================================================
+    private void handleMobilePush(Notification event) {
+        try {
+            if ("ALL".equalsIgnoreCase(event.getReceiver())) {
+                List<String> tokens = userRepository.findAllPushTokens();
+                for (String token : tokens) {
+                    pushNotificationService.sendNotification(token, event.getSubject(), event.getMessage());
+                }
+            } else {
+                Long userId = Long.parseLong(event.getReceiver());
+                userRepository.findById(userId).ifPresent(user -> {
+                    if (user.getExpoPushToken() != null && !user.getExpoPushToken().isEmpty()) {
+                        pushNotificationService.sendNotification(user.getExpoPushToken(), event.getSubject(), event.getMessage());
+                    }
+                });
+            }
+        } catch (Exception e) {
+            log.error("Mobile Push failed", e);
+        }
+    }
 
-    @Cacheable(value = "unreadCount", key = "#receiver")
+
     public Long getUnreadCount(String receiver) {
         enforceOwnership(receiver);
         return repository.countByReceiverAndReadFalseAndDeletedFalse(receiver);
     }
 
-    @Cacheable(value = "unreadNotifications", key = "#receiver + '_' + #page + '_' + #size")
     @Transactional(readOnly = true)
     public List<Notification> getUnreadNotifications(String receiver, Integer page, Integer size) {
         enforceOwnership(receiver);
@@ -129,7 +138,6 @@ public class NotificationService {
         return repository.findByReceiverAndReadFalseAndDeletedFalse(receiver, pageable).getContent();
     }
 
-    @Cacheable(value = "getAllNotifications", key = "#receiver + '_' + #page + '_' + #size")
     @Transactional(readOnly = true)
     public List<Notification> getAllNotifications(String receiver, Integer page, Integer size) {
         enforceOwnership(receiver);
@@ -137,9 +145,6 @@ public class NotificationService {
         return repository.findNonChatNotificationsByReceiver(receiver, pageable).getContent();
     }
 
-    // ==================================================================================
-    // UPDATING / ACTIONS (Fixes Applied Here)
-    // ==================================================================================
 
     public void markAsRead(Long id, String userId) {
         Notification notification = repository.findById(id)
@@ -148,16 +153,12 @@ public class NotificationService {
 
         notification.setRead(true);
         repository.save(notification);
-
-        // FIX: Manual Call
-        manualEvictUserCache(notification.getReceiver());
     }
 
     @Transactional
     public void markAllAsRead(String userId) {
         enforceOwnership(userId);
         repository.markAllAsRead(userId);
-        manualEvictUserCache(userId);
     }
 
     public void deleteMessage(Long id, String userId) {
@@ -167,15 +168,12 @@ public class NotificationService {
 
         notification.setDeleted(true);
         repository.save(notification);
-
-        manualEvictUserCache(notification.getReceiver());
     }
 
     @Transactional
     public void deleteAllMessages(String userId) {
         enforceOwnership(userId);
         repository.markAllAsDeleted(userId);
-        manualEvictUserCache(userId);
     }
 
     public void stardMessage(Long id, String userId) {
@@ -185,7 +183,6 @@ public class NotificationService {
 
         notification.setStared(true);
         repository.save(notification);
-        manualEvictUserCache(notification.getReceiver());
     }
 
     public void unstardMessage(Long id, String userId) {
@@ -195,33 +192,6 @@ public class NotificationService {
 
         notification.setStared(false);
         repository.save(notification);
-        manualEvictUserCache(notification.getReceiver());
-    }
-
-    // ==================================================================================
-    // CACHE & SECURITY UTILS
-    // ==================================================================================
-
-    @CacheEvict(value = {"unreadCount", "unreadNotifications", "getAllNotifications"}, allEntries = true)
-    public void evictAllCaches() {
-        log.info("Evicting ALL notification caches.");
-    }
-
-    public void manualEvictUserCache(String receiver) {
-        try {
-            String countKey = "unreadCount::" + receiver;
-            redisTemplate.delete(countKey);
-
-         Set<String> unreadKeys = redisTemplate.keys("unreadNotifications::" + receiver + "_*");
-            if (unreadKeys != null && !unreadKeys.isEmpty()) redisTemplate.delete(unreadKeys);
-
-            Set<String> allKeys = redisTemplate.keys("getAllNotifications::" + receiver + "_*");
-            if (allKeys != null && !allKeys.isEmpty()) redisTemplate.delete(allKeys);
-
-            log.info("Cache evicted for user: {}", receiver);
-        } catch (Exception e) {
-            log.error("Failed to evict cache for user {}", receiver, e);
-        }
     }
 
     private void enforceOwnership(String receiver) {

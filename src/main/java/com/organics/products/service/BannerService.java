@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -190,11 +191,11 @@ public class BannerService {
 
         if (images != null && images.length > 0) {
 
-            log.info("Replacing images for banner ID {}", id);
+            log.info("Adding new images to banner ID {}", id);
 
-            if (banner.getImageUrls() != null && !banner.getImageUrls().isEmpty()) {
-                banner.getImageUrls().forEach(s3Service::deleteFile);
-                banner.getImageUrls().clear();
+
+            if (banner.getImageUrls() == null) {
+                banner.setImageUrls(new ArrayList<>());
             }
 
             List<String> newImageKeys = Arrays.stream(images)
@@ -207,10 +208,12 @@ public class BannerService {
                             throw new RuntimeException("Failed to upload banner image");
                         }
                     })
-                    .collect(Collectors.toList());
+                    .toList();
 
-            banner.setImageUrls(newImageKeys);
+
+            banner.getImageUrls().addAll(newImageKeys);
         }
+
 
         Banner updated = bannerRepository.save(banner);
 

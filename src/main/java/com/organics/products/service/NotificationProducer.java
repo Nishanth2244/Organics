@@ -119,25 +119,25 @@
 //        // to consolidate user lookup and token handling.
 //    }
 //}
-
-package com.organics.products.service;
-
-import com.organics.products.entity.Notification;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.stereotype.Service;
-
-@Service
-@Slf4j
-public class NotificationProducer {
-
-    @Autowired
-    private RedisTemplate<String, Object> redisTemplate;
-
-    public void sendNotification(Notification notification) {
-        log.info("Publishing notification to Redis for receiver: {}", notification.getReceiver());
-        // Triggers the EventListener
-        redisTemplate.convertAndSend("notifications:all", notification);
-    }
-}
+//
+//package com.organics.products.service;
+//
+//import com.organics.products.entity.Notification;
+//import lombok.extern.slf4j.Slf4j;
+//import org.springframework.beans.factory.annotation.Autowired;
+//import org.springframework.data.redis.core.RedisTemplate;
+//import org.springframework.stereotype.Service;
+//
+//@Service
+//@Slf4j
+//public class NotificationProducer {
+//
+//    @Autowired
+//    private RedisTemplate<String, Object> redisTemplate;
+//
+//    public void sendNotification(Notification notification) {
+//        log.info("Publishing notification to Redis for receiver: {}", notification.getReceiver());
+//        // Triggers the EventListener
+//        redisTemplate.convertAndSend("notifications:all", notification);
+//    }
+//}

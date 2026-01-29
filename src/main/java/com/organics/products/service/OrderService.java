@@ -979,12 +979,10 @@ public class OrderService {
         Address selectedAddress = addressRepository.findById(request.getAddressId())
                 .orElseThrow(() -> new ResourceNotFoundException("Address not found"));
 
-        // 1. Product MRP and Base Discount Calculation (Product or Category)
         Double mrp = product.getMRP();
 
-        // discountService use chesi final price (Product/Category discount apply ayyaka) techukuntunnam
         Double discountedUnitPrice = discountService.calculateFinalPrice(product);
-        Double productDiscountPerItem = mrp - discountedUnitPrice; // Ee discount already apply ayipoindi
+        Double productDiscountPerItem = mrp - discountedUnitPrice;
 
         // 2. Subtotal calculation
         Double subTotal = discountedUnitPrice * request.getQuantity();
@@ -993,11 +991,10 @@ public class OrderService {
 
         log.info("Order amount after item/category discount: {}", finalOrderAmount);
 
-        // 3. Coupon Discount Calculation (Max discount limit lekunda)
         if (request.getCouponCode() != null && !request.getCouponCode().isEmpty()) {
             Coupon coupon = couponRepository.findByCode(request.getCouponCode());
 
-            if(coupon == null) {
+            if (coupon == null) {
                 throw new ResourceNotFoundException("Coupon not valid");
             }
 
@@ -1009,7 +1006,6 @@ public class OrderService {
                 throw new RuntimeException("Minimum order amount for this coupon is: " + coupon.getMinOrderAmount());
             }
 
-            // Percentage unte motham amount meeda apply chesthunnam (Max amount condition lekunda)
             if (coupon.getDiscountType() == DiscountType.PERCENT) {
                 couponDiscountTotal = (subTotal * coupon.getDiscountValue()) / 100;
             } else {
@@ -1020,11 +1016,15 @@ public class OrderService {
             log.info("Coupon discount amount: {}", couponDiscountTotal);
         }
 
+
+        Double finalPricePerUnit = finalOrderAmount / request.getQuantity();
+        Double totalDiscountPerUnit = mrp - finalPricePerUnit;
+
         // 4. Create Order
         Order order = new Order();
         order.setUser(user);
         order.setOrderDate(LocalDate.now());
-        order.setOrderAmount(finalOrderAmount); // Final amount after all discounts
+        order.setOrderAmount(finalOrderAmount);
         order.setOrderStatus(OrderStatus.PENDING);
         order.setPaymentStatus(PaymentStatus.PENDING);
         order.setShippingAddress(selectedAddress);
@@ -1036,8 +1036,13 @@ public class OrderService {
         orderItem.setOrder(savedOrder);
         orderItem.setProduct(product);
         orderItem.setQuantity(request.getQuantity());
-        orderItem.setPrice(discountedUnitPrice); // Item base price (after product/category discount)
-        orderItem.setDiscount(productDiscountPerItem);
+
+        // FIX: Use the unit price that includes the coupon discount
+        orderItem.setPrice(finalPricePerUnit);
+
+        // FIX: Set the discount field to the total amount saved (Product + Coupon)
+        orderItem.setDiscount(totalDiscountPerUnit);
+
         orderItem.setTax(mrp * 0.05); // Standard tax on MRP
 
         orderItemsRepository.save(orderItem);
