@@ -18,10 +18,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 @Slf4j
 @Service
@@ -428,41 +425,58 @@ public class ShiprocketService {
         request.put("shipping_is_billing", true);
 
         // Order items
-        List<Map<String, Object>> orderItems = new ArrayList<>();
+        Map<String, Map<String, Object>> skuItemMap = new LinkedHashMap<>();
+
         double subTotal = 0.0;
         double totalDiscount = 0.0;
         double totalTax = 0.0;
 
         for (OrderItems item : order.getOrderItems()) {
-            Map<String, Object> orderItem = new HashMap<>();
-            orderItem.put("name", item.getProduct().getProductName());
-            orderItem.put("sku", getSku(item.getProduct()));
-            orderItem.put("units", item.getQuantity());
 
-            // Get prices from order item
+            Product product = item.getProduct();
+            String sku = getSku(product);
+
             double price = item.getPrice() != null ? item.getPrice() : 0.0;
             double tax = item.getTax() != null ? item.getTax() : 0.0;
             double discount = item.getDiscount() != null ? item.getDiscount() : 0.0;
+            int quantity = item.getQuantity();
 
-            orderItem.put("selling_price", price);
-            orderItem.put("discount", discount);
-            orderItem.put("tax", tax);
-            orderItem.put("hsn", "123456");
+            Map<String, Object> orderItem = skuItemMap.get(sku);
 
-            orderItems.add(orderItem);
+            if (orderItem == null) {
+                orderItem = new HashMap<>();
+                orderItem.put("name", product.getProductName());
+                orderItem.put("sku", sku);
+                orderItem.put("units", quantity);
+                orderItem.put("selling_price", price);
+                orderItem.put("discount", discount);
+                orderItem.put("tax", tax);
+                orderItem.put("hsn", "123456");
 
-            // Calculate totals
-            double itemTotal = price * item.getQuantity();
+                skuItemMap.put(sku, orderItem);
+            } else {
+                //  MERGE quantities & values
+                int existingUnits = (int) orderItem.get("units");
+                orderItem.put("units", existingUnits + quantity);
+
+                orderItem.put("discount",
+                        ((double) orderItem.get("discount")) + discount);
+
+                orderItem.put("tax",
+                        ((double) orderItem.get("tax")) + tax);
+            }
+
+            // Totals (keep your existing logic)
+            double itemTotal = price * quantity;
             subTotal += itemTotal;
-            totalTax += tax * item.getQuantity();
-            totalDiscount += discount * item.getQuantity();
+            totalTax += tax * quantity;
+            totalDiscount += discount * quantity;
 
-            log.info("Shiprocket Item: {} x {} @ {} = {}, Discount: {}, Tax: {}",
-                    item.getProduct().getProductName(), item.getQuantity(), price,
-                    itemTotal, discount, tax);
+            log.info("Shiprocket Item (merged): {} | SKU={} | Qty={}",
+                    product.getProductName(), sku, quantity);
         }
 
-        request.put("order_items", orderItems);
+        request.put("order_items", new ArrayList<>(skuItemMap.values()));
         request.put("sub_total", subTotal);
         //request.put("total_discount", totalDiscount);
 

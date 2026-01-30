@@ -190,7 +190,6 @@ public class OrderService {
             }
 
 
-
             // Calculate selling price (total price for this item's quantity)
             double itemTotalPrice = itemMrpValue - itemDiscount;
 
@@ -205,14 +204,15 @@ public class OrderService {
 
             orderItem.setPrice(pricePerUnit);
             orderItem.setDiscount(itemDiscount / cartItem.getQuantity());
-            orderItem.setTax(itemTax / cartItem.getQuantity());  // tax per unit
+            orderItem.setTax(itemTax / cartItem.getQuantity());
 
             orderItemsList.add(orderItem);
 
-            // Update totals
+            // Update totals ONCE
             calculatedTotal += itemTotalPrice + itemTax;
             calculatedTotalTax += itemTax;
             calculatedTotalDiscount += itemDiscount;
+
 
 
 
@@ -644,7 +644,9 @@ public class OrderService {
         dto.setItemDiscount(orderItemDiscount);
         dto.setCartDiscount(totalCartDiscount);
         dto.setTotalDiscount(totalCartDiscount);
-        dto.setGrandTotal(order.getOrderAmount() + orderTax );
+        dto.setGrandTotal(orderSubtotal + orderTax - totalCartDiscount);
+
+
 
         return dto;
     }
