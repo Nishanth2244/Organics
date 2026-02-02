@@ -99,8 +99,7 @@ public class UserService {
     // Update Display Name
     @CacheEvict(
             value = { "userProfile", "userDisplayName", "allUsers" },
-            key = "T(com.organics.products.config.SecurityUtil).getCurrentUserId().orElse(null)"
-    )
+            key = "T(com.organics.products.config.SecurityUtil).getCurrentUserId().orElse(null)")
     public void updateDisplayName(String displayName) {
 
         if (displayName == null || displayName.trim().isEmpty()) {
@@ -162,8 +161,7 @@ public class UserService {
     @Cacheable(
             value = "userDisplayName",
             key = "T(com.organics.products.config.SecurityUtil).getCurrentUserId().orElse(null)",
-            unless = "#result == null"
-    )
+            unless = "#result == null")
     public UserDTO getMyDisplayName() {
 
         Long userId = SecurityUtil.getCurrentUserId()
@@ -191,8 +189,7 @@ public class UserService {
     }
     @CacheEvict(
             value = { "userProfile", "allUsers" },
-            key = "#userId"
-    )
+            key = "#userId")
     public void updatePushToken(Long userId, String token) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));

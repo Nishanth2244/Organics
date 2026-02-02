@@ -51,7 +51,6 @@ public class CategoryController {
 
 	}
 
-
 	@GetMapping("/Active")
 	public ResponseEntity<Page<CategoryDTO>> getActive(@RequestParam(defaultValue = "0")int page,@RequestParam(defaultValue = "10")int size){
 

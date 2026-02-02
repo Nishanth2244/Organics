@@ -86,243 +86,180 @@ public class OrderService {
                 .orElseThrow(() -> new RuntimeException("User not authenticated"));
 
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + userId));
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
-        Address selectedAddress = null;
+        log.info("🛒 Placing order for userId={}", userId);
+
+
+        Address selectedAddress;
         if (orderRequest.getAddressId() != null) {
             selectedAddress = addressRepository.findById(orderRequest.getAddressId())
                     .orElseThrow(() -> new ResourceNotFoundException("Address not found"));
 
             if (!selectedAddress.getUser().getId().equals(userId)) {
-                throw new ResourceNotFoundException("Address doesn't belong to user");
+                throw new RuntimeException("Address does not belong to user");
             }
         } else {
             selectedAddress = addressRepository.findPrimaryAddressByUserId(userId)
-                    .orElse(addressRepository.findFirstByUserId(userId)
-                            .orElseThrow(() -> new ResourceNotFoundException("No address found for user")));
+                    .orElseThrow(() -> new RuntimeException("No address found"));
         }
 
-        Cart activeCart = cartRepository.findByUserAndIsActive(user, true)
+      // CART & ITEMS
+        Cart cart = cartRepository.findByUserAndIsActive(user, true)
                 .stream()
                 .findFirst()
-                .orElseThrow(() -> new ResourceNotFoundException("No active cart found"));
+                .orElseThrow(() -> new RuntimeException("No active cart"));
 
-        List<CartItems> cartItems = cartItemRepository.findByCartIdWithProduct(activeCart.getId());
-        if (cartItems == null || cartItems.isEmpty()) {
-            throw new RuntimeException("Cart is empty. Cannot place order.");
+        List<CartItems> cartItems = cartItemRepository.findByCartIdWithProduct(cart.getId());
+
+        if (cartItems.isEmpty()) {
+            throw new RuntimeException("Cart is empty");
         }
 
-        // Get cart details
-        Double cartDiscount = activeCart.getDiscountAmount() != null ? activeCart.getDiscountAmount() : 0.0;
-        Double cartPayableAmount = activeCart.getPayableAmount();
-        Double cartSubtotal = activeCart.getPayableAmount() != null ? activeCart.getPayableAmount() : 0.0;
+        double cartDiscount = cart.getDiscountAmount() != null ? cart.getDiscountAmount() : 0.0;
 
-        log.info("Cart Details - Discount: {}, Payable: {}, Subtotal: {}",
-                cartDiscount, cartPayableAmount, cartSubtotal);
+        log.info("📦 Cart items={}, Cart discount={}", cartItems.size(), cartDiscount);
 
-        List<Inventory> inventoriesToReserve = new ArrayList<>();
-        Map<Long, Integer> productQuantities = new HashMap<>();
-
-        // First pass: collect inventory and calculate total MRP
+      // FIRST PASS – MRP + STOCK
         double totalCartMrp = 0.0;
-        for (CartItems cartItem : cartItems) {
-            Product product = cartItem.getInventory().getProduct();
+        Map<Long, Integer> productQtyMap = new HashMap<>();
+        List<Inventory> inventoriesToReserve = new ArrayList<>();
 
-            List<Inventory> inventories = inventoryRepository.findByProductId(product.getId());
+        for (CartItems item : cartItems) {
+            Inventory inventory = item.getInventory();
+            Product product = inventory.getProduct();
 
-            if (inventories.isEmpty()) {
-                throw new RuntimeException("No inventory found for product: " + product.getProductName());
-            }
-
-            Inventory inventory = inventories.get(0);
-
-            if (inventory.getAvailableStock() < cartItem.getQuantity()) {
-                throw new RuntimeException("Insufficient stock for product: " +
-                        product.getProductName() +
-                        ". Available: " + inventory.getAvailableStock() +
-                        ", Requested: " + cartItem.getQuantity());
+            if (inventory.getAvailableStock() < item.getQuantity()) {
+                throw new RuntimeException("Insufficient stock for " + product.getProductName());
             }
 
             inventoriesToReserve.add(inventory);
-            productQuantities.put(inventory.getId(), cartItem.getQuantity());
+            productQtyMap.put(inventory.getId(), item.getQuantity());
 
-            // Calculate total MRP
-            Double mrp = product.getMRP();
-            totalCartMrp += (mrp != null ? mrp : 0.0) * cartItem.getQuantity();
+            totalCartMrp += product.getMRP() * item.getQuantity();
         }
 
+        log.info(" Total cart MRP={}", totalCartMrp);
+
+      // CREATE ORDER (NO AMOUNT)
         Order order = new Order();
+        order.setUser(user);
+        order.setCart(cart);
+        order.setShippingAddress(selectedAddress);
         order.setOrderDate(LocalDate.now());
-        order.setOrderAmount(cartPayableAmount != null ? cartPayableAmount : 0.0);
-        order.setDescription(orderRequest.getDescription());
         order.setOrderStatus(OrderStatus.PENDING);
         order.setPaymentStatus(PaymentStatus.PENDING);
-        order.setUser(user);
-        order.setCart(activeCart);
-        order.setShippingAddress(selectedAddress);
 
         Order savedOrder = orderRepository.save(order);
+
+       // SECOND PASS – PRICING
         List<OrderItems> orderItemsList = new ArrayList<>();
 
-        double calculatedTotal = 0.0;
-        double calculatedTotalTax = 0.0;
-        double calculatedTotalDiscount = 0.0;
+        double finalAmount = 0.0;
+        double totalTax = 0.0;
+        double totalDiscount = 0.0;
 
-        // Second pass: calculate item prices with proportional discount
-        for (CartItems cartItem : cartItems) {
-            Product product = cartItem.getInventory().getProduct();
+        for (CartItems item : cartItems) {
+
+            Product product = item.getInventory().getProduct();
+            int qty = item.getQuantity();
+            double mrp = product.getMRP();
+
+            double itemMrpValue = mrp * qty;
+
+            double itemDiscount = (cartDiscount > 0 && totalCartMrp > 0)
+                    ? (itemMrpValue / totalCartMrp) * cartDiscount
+                    : 0.0;
+
+            double netItemPrice = itemMrpValue - itemDiscount;
+
+            double taxPercent = taxService.getTaxPercentByCategoryId(
+                    product.getCategory().getId());
+
+            double itemTax = (netItemPrice * taxPercent) / 100;
 
             OrderItems orderItem = new OrderItems();
             orderItem.setOrder(savedOrder);
             orderItem.setProduct(product);
-            orderItem.setQuantity(cartItem.getQuantity());
-
-            // Get product MRP
-            Double mrp = product.getMRP();
-            if (mrp == null || mrp <= 0) {
-                throw new RuntimeException("Invalid MRP for product: " + product.getProductName());
-            }
-
-            // Calculate item's share of cart discount
-            double itemMrpValue = mrp * cartItem.getQuantity();
-            double itemDiscount = 0.0;
-
-            if (cartDiscount > 0 && totalCartMrp > 0) {
-                // Calculate proportional discount for this item
-                itemDiscount = (itemMrpValue / totalCartMrp) * cartDiscount;
-            }
-
-
-            // Calculate selling price (total price for this item's quantity)
-            double itemTotalPrice = itemMrpValue - itemDiscount;
-
-            // Calculate price per unit
-            double pricePerUnit = itemTotalPrice / cartItem.getQuantity();
-
-
-            //Tax Calculation here
-            Long categoryId = product.getCategory().getId();
-            double taxPercent = taxService.getTaxPercentByCategoryId(categoryId);
-            double itemTax = itemTotalPrice * taxPercent / 100;
-
-            orderItem.setPrice(pricePerUnit);
-            orderItem.setDiscount(itemDiscount / cartItem.getQuantity());
-            orderItem.setTax(itemTax / cartItem.getQuantity());
+            orderItem.setQuantity(qty);
+            orderItem.setPrice(netItemPrice / qty);
+            orderItem.setDiscount(itemDiscount / qty);
+            orderItem.setTax(itemTax / qty);
 
             orderItemsList.add(orderItem);
 
-            // Update totals ONCE
-            calculatedTotal += itemTotalPrice + itemTax;
-            calculatedTotalTax += itemTax;
-            calculatedTotalDiscount += itemDiscount;
+            finalAmount += netItemPrice + itemTax;
+            totalTax += itemTax;
+            totalDiscount += itemDiscount;
 
-
-            orderItem.setPrice(pricePerUnit); // Price per unit
-            orderItem.setDiscount(itemDiscount / cartItem.getQuantity()); // Discount per unit
-            orderItem.setTax(itemTax / cartItem.getQuantity()); // Tax per unit
-
-            orderItemsList.add(orderItem);
-
-            // Update calculated totals
-            calculatedTotal += itemTotalPrice + itemTax;
-            calculatedTotalTax += itemTax;
-            calculatedTotalDiscount += itemDiscount;
-
-            log.info("Order Item Calculation:");
-            log.info("Product: {}", product.getProductName());
-            log.info("MRP: {}, Quantity: {}", mrp, cartItem.getQuantity());
-            log.info("Item MRP Value: {}", itemMrpValue);
-            log.info("Item Discount: {}", itemDiscount);
-            log.info("Item Total Price (after discount): {}", itemTotalPrice);
-            log.info("Price per unit: {}", pricePerUnit);
-            log.info("Item Tax: {}", itemTax);
-            log.info("Item Total (price + tax): {}", itemTotalPrice + itemTax);
+            /* ---------- LOGS ---------- */
+            log.info(" Item: {}", product.getProductName());
+            log.info("   MRP/unit      : {}", mrp);
+            log.info("   Quantity      : {}", qty);
+            log.info("   Item Discount : {}", itemDiscount);
+            log.info("   Item Tax      : {}", itemTax);
+            log.info("   Item Total    : {}", netItemPrice + itemTax);
         }
-
 
         if (orderItemsList.isEmpty()) {
-            throw new RuntimeException("No valid items to create order.");
+            throw new RuntimeException("No valid items to create order");
         }
 
-        // Log calculated totals for debugging
-        log.info("=== Order Calculation Summary ===");
-        log.info("Total MRP: {}", totalCartMrp);
-        log.info("Cart Discount: {}", cartDiscount);
-        log.info("Cart Payable Amount: {}", cartPayableAmount);
-        log.info("Calculated Total (items + tax): {}", calculatedTotal);
-        log.info("Calculated Tax: {}", calculatedTotalTax);
-        log.info("Calculated Discount: {}", calculatedTotalDiscount);
-
-        // Verify calculation matches cart payable amount
-        if (cartPayableAmount != null) {
-            double difference = Math.abs(cartPayableAmount - calculatedTotal);
-            log.info("Difference from cart payable: {}", difference);
-
-            // If there's a significant difference, adjust
-            if (difference > 1.0) {
-                log.warn("Calculated total differs from cart payable amount by {}", difference);
-                // You might want to adjust here if needed
-            }
-        }
-        log.info("================================");
-
+     //  SAVE ITEMS + FINAL AMOUNT
         orderItemsRepository.saveAll(orderItemsList);
+
         savedOrder.setOrderItems(orderItemsList);
-
-        // Reserve inventory
-        for (Inventory inventory : inventoriesToReserve) {
-            Integer quantity = productQuantities.get(inventory.getId());
-            try {
-                inventoryService.reserveStock(inventory.getId(), quantity, savedOrder.getId());
-                log.info("Stock reserved for product {}: {} units. Available: {}, Reserved: {}",
-                        inventory.getProduct().getProductName(), quantity,
-                        inventory.getAvailableStock() - quantity,
-                        inventory.getReservedStock() + quantity);
-            } catch (Exception e) {
-                orderRepository.delete(savedOrder);
-                throw new RuntimeException("Failed to reserve stock for product: " +
-                        inventory.getProduct().getProductName() + ". " + e.getMessage());
-            }
-        }
-
-        log.info("Order placed successfully. Order ID: {}, Amount: {}",
-                savedOrder.getId(), savedOrder.getOrderAmount());
-
-        // IMPORTANT: Send order to Shiprocket with correct amount
-        try {
-            ShiprocketCreateOrderResponse shiprocketResponse = shiprocketService.createOrder(savedOrder, user, selectedAddress);
-
-            if (shiprocketResponse.getOrderId() != null && shiprocketResponse.getOrderId() > 0) {
-                savedOrder.setShiprocketOrderId(String.valueOf(shiprocketResponse.getOrderId()));
-            }
-            if (shiprocketResponse.getShipmentId() != null) {
-                savedOrder.setShiprocketShipmentId(shiprocketResponse.getShipmentId());
-            }
-            if (shiprocketResponse.getAwbCode() != null) {
-                savedOrder.setShiprocketAwbCode(shiprocketResponse.getAwbCode());
-                savedOrder.setShiprocketTrackingUrl("https://shiprocket.co/tracking/" + shiprocketResponse.getAwbCode());
-            }
-            if (shiprocketResponse.getCourierName() != null) {
-                savedOrder.setShiprocketCourierName(shiprocketResponse.getCourierName());
-            }
-
-            log.info("Shiprocket order created successfully!");
-
-        } catch (Exception e) {
-            log.error("Failed to create Shiprocket order: {}", e.getMessage());
-
-            String errorMessage = e.getMessage();
-            if (errorMessage != null && errorMessage.length() > 200) {
-                errorMessage = errorMessage.substring(0, 200);
-            }
-            savedOrder.setShiprocketOrderId("FAILED: " + errorMessage);
-
-            log.warn("Order saved locally. Shiprocket error: {}", errorMessage);
-        }
+        savedOrder.setOrderAmount(finalAmount);
 
         orderRepository.save(savedOrder);
+
+        log.info(" Order created. Final Amount={}", finalAmount);
+
+    //   INVENTORY RESERVATION
+        for (Inventory inv : inventoriesToReserve) {
+            inventoryService.reserveStock(
+                    inv.getId(),
+                    productQtyMap.get(inv.getId()),
+                    savedOrder.getId()
+            );
+        }
+
+      // SHIPROCKET INTEGRATION
+        try {
+            ShiprocketCreateOrderResponse response =
+                    shiprocketService.createOrder(savedOrder, user, selectedAddress);
+
+            if (response != null) {
+                savedOrder.setShiprocketOrderId(
+                        response.getOrderId() != null ? String.valueOf(response.getOrderId()) : null);
+                savedOrder.setShiprocketShipmentId(response.getShipmentId());
+                savedOrder.setShiprocketAwbCode(response.getAwbCode());
+                savedOrder.setShiprocketCourierName(response.getCourierName());
+
+                if (response.getAwbCode() != null) {
+                    savedOrder.setShiprocketTrackingUrl(
+                            "https://shiprocket.co/tracking/" + response.getAwbCode());
+                }
+
+                orderRepository.save(savedOrder);
+                log.info(" Shiprocket order created. ShipmentId={}", response.getShipmentId());
+            }
+        } catch (Exception e) {
+            log.error(" Shiprocket failed: {}", e.getMessage());
+            savedOrder.setShiprocketOrderId("FAILED");
+            orderRepository.save(savedOrder);
+        }
+
+
+        log.info(" ORDER SUMMARY");
+        log.info("   Subtotal MRP : {}", totalCartMrp);
+        log.info("   Discount     : {}", totalDiscount);
+        log.info("   Tax          : {}", totalTax);
+        log.info("   Grand Total  : {}", finalAmount);
+
         return convertToOrderDTO(savedOrder);
     }
+
 
     private Cart getActiveCartWithItems(Long userId) {
         Optional<Cart> cartOpt = cartRepository.findByIdWithItemsAndUser(userId);
@@ -389,8 +326,7 @@ public class OrderService {
         return convertToOrderDTO(order);
     }
     @Cacheable(
-            value = "adminOrders",
-            key = "'all'")
+            value = "adminOrders", key = "'all'")
     @Transactional(readOnly = true)
     public List<OrderDTO> getAllOrders() {
         if (!SecurityUtil.isAdmin()) {
@@ -659,8 +595,7 @@ public class OrderService {
     }
 
     @Cacheable(
-            value = "orderStats",
-            key = "'summary'")
+            value = "orderStats", key = "'summary'")
     @Transactional(readOnly = true)
     public Map<String, Object> getOrderStatistics() {
         if (!SecurityUtil.isAdmin()) {
@@ -699,8 +634,7 @@ public class OrderService {
     }
 
     @Cacheable(
-            value = "adminOrders",
-            key = "'date-' + #date")
+            value = "adminOrders", key = "'date-' + #date")
     @Transactional(readOnly = true)
     public List<OrderDTO> getOrdersOnDate(LocalDate date) {
         if (!SecurityUtil.isAdmin()) {
@@ -718,8 +652,7 @@ public class OrderService {
     }
 
     @Cacheable(
-            value = "orderStats",
-            key = "'daily-' + #startDate + '-' + #endDate")
+            value = "orderStats", key = "'daily-' + #startDate + '-' + #endDate")
     @Transactional(readOnly = true)
     public List<DailyOrderStatsDTO> getDailyOrderStatistics(LocalDate startDate, LocalDate endDate) {
         if (!SecurityUtil.isAdmin()) {
@@ -772,7 +705,8 @@ public class OrderService {
         stats.sort(Comparator.comparing(DailyOrderStatsDTO::getDate));
         return stats;
     }
-
+    @Cacheable(
+            value = "adminOrders", key = "'today'", unless = "#result == null || #result.isEmpty()")
     @Transactional(readOnly = true)
     public List<OrderDTO> getTodayOrders() {
         if (!SecurityUtil.isAdmin()) {
@@ -786,6 +720,9 @@ public class OrderService {
                 .collect(Collectors.toList());
     }
 
+    @Cacheable(
+            value = "adminOrders", key = "'month-' + T(java.time.LocalDate).now().getMonthValue()",
+            unless = "#result == null || #result.isEmpty()")
     @Transactional(readOnly = true)
     public List<OrderDTO> getThisMonthOrders() {
         if (!SecurityUtil.isAdmin()) {
@@ -801,6 +738,8 @@ public class OrderService {
                 .collect(Collectors.toList());
     }
 
+    @Cacheable(
+            value = "orderStats", key = "'today-summary'", unless = "#result == null")
     @Transactional(readOnly = true)
     public Map<String, Object> getTodayOrderCount() {
         if (!SecurityUtil.isAdmin()) {
@@ -820,6 +759,9 @@ public class OrderService {
 
         return result;
     }
+
+    @Cacheable(
+            value = "orderStats", key = "'today-status'", unless = "#result == null")
     @Transactional(readOnly = true)
     public Map<String, Long> getTodayOrderCountByStatus() {
         if (!SecurityUtil.isAdmin()) {
@@ -845,6 +787,9 @@ public class OrderService {
     public Map<String, Object> getMonthlyOrderCount() {
         return getThisMonthOrderCount();
     }
+    @Cacheable(
+            value = "orderStats", key = "'month-summary-' + T(java.time.LocalDate).now().getMonthValue()",
+            unless = "#result == null")
     @Transactional(readOnly = true)
     public Map<String, Object> getThisMonthOrderCount() {
         if (!SecurityUtil.isAdmin()) {
@@ -871,7 +816,9 @@ public class OrderService {
 
         return result;
     }
-
+    @Cacheable(
+            value = "orderStats", key = "'month-status-' + T(java.time.LocalDate).now().getMonthValue()",
+            unless = "#result == null")
     @Transactional(readOnly = true)
     public Map<String, Long> getThisMonthOrderCountByStatus() {
         if (!SecurityUtil.isAdmin()) {
@@ -952,15 +899,14 @@ public class OrderService {
         }
     }
 
-
-    // Add this method to your OrderService class
-
+    @Cacheable(
+            value = "topProducts", key = "#limit + '-' + #startDate + '-' + #endDate + '-' + #inventoryId",
+            unless = "#result == null || #result.isEmpty()")
     @Transactional(readOnly = true)
     public List<TopOrderedProductsDTO> getTopOrderedProducts(Integer limit, LocalDate startDate, LocalDate endDate, Long inventoryId) {
         if (!SecurityUtil.isAdmin()) {
             throw new RuntimeException("Unauthorized: Admin access required");
         }
-
         List<TopOrderedProductsDTO> results;
 
         if (inventoryId != null) {
@@ -987,8 +933,7 @@ public class OrderService {
                 .collect(Collectors.toList());
     }
     @Cacheable(
-            value = "topProducts",
-            key = "#limit + '-' + #startDate + '-' + #endDate + '-' + #inventoryId")
+            value = "topProducts", key = "#limit + '-' + #startDate + '-' + #endDate + '-' + #inventoryId")
     @Transactional(readOnly = true)
     public List<TopOrderedProductsDTO> getTopOrderedProductsLast30Days() {
         if (!SecurityUtil.isAdmin()) {
@@ -1004,120 +949,11 @@ public class OrderService {
                 .limit(10)
                 .collect(Collectors.toList());
     }
-
-    @CacheEvict(
-            value = { "userOrders", "adminOrders", "orderStats", "topProducts"}, allEntries = true)
-    @Transactional
-    public OrderDTO buyNowOrder(BuyNowRequestDTO request) {
-
-        Long userId = SecurityUtil.getCurrentUserId().
-                orElseThrow(() -> new RuntimeException("User not authenticated"));
-
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
-
-        Product product = productRepository.findById(request.getProductId())
-                .orElseThrow(() -> new ResourceNotFoundException("Product not found"));
-
-        Address selectedAddress = addressRepository.findById(request.getAddressId())
-                .orElseThrow(() -> new ResourceNotFoundException("Address not found"));
-
-
-        Double mrp = product.getMRP();
-        Double discountedUnitPrice = mrp;
-        Double productDiscountPerItem = 0.0;
-
-        List<ProductDiscount> productDiscounts = productDiscountRepository.findByProductId(product.getId());
-        Optional<ProductDiscount> activeDiscount = productDiscounts.stream().filter(pd -> pd.getDiscount().getActive())
-                .findFirst();
-
-        if (activeDiscount.isPresent()) {
-            Discount d = activeDiscount.get().getDiscount();
-            if (d.getDiscountType() == DiscountType.PERCENT) {
-                productDiscountPerItem = (mrp * d.getDiscountValue()) / 100;
-            } else {
-                productDiscountPerItem = d.getDiscountValue();
-            }
-            discountedUnitPrice = mrp - productDiscountPerItem;
-        }
-
-        Double subTotal = discountedUnitPrice * request.getQuantity();
-        Double finalOrderAmount = subTotal;
-        Double couponDiscountTotal = 0.0;
-
-        if (request.getCouponCode() != null && !request.getCouponCode().isEmpty()) {
-            Coupon coupon = couponRepository.findByCode(request.getCouponCode());
-
-            if(coupon == null) {
-                throw new ResourceNotFoundException("Coupon not valid");
-            }
-
-            if (!coupon.isActive() || coupon.getEndDate().isBefore(LocalDate.now())) {
-                throw new RuntimeException("Coupon expired or inactive");
-            }
-
-            if (subTotal < coupon.getMinOrderAmount()) {
-                throw new RuntimeException("Minimum order amount for this coupon is: " + coupon.getMinOrderAmount());
-            }
-
-            if (coupon.getDiscountType() == DiscountType.PERCENT) {
-                couponDiscountTotal = (subTotal * coupon.getDiscountValue()) / 100;
-                if (coupon.getMaxDiscountAmount() != null && couponDiscountTotal > coupon.getMaxDiscountAmount()) {
-                    couponDiscountTotal = coupon.getMaxDiscountAmount();
-                }
-            } else {
-                couponDiscountTotal = coupon.getDiscountValue();
-            }
-
-            finalOrderAmount = subTotal - couponDiscountTotal;
-        }
-
-        Order order = new Order();
-        order.setUser(user);
-        order.setOrderDate(LocalDate.now());
-        order.setOrderAmount(finalOrderAmount);
-        order.setOrderStatus(OrderStatus.PENDING);
-        order.setPaymentStatus(PaymentStatus.PENDING);
-        order.setShippingAddress(selectedAddress);
-
-
-        log.error("final amount after coupon and discount calcluaction {}", finalOrderAmount);
-
-        Order savedOrder = orderRepository.save(order);
-
-        OrderItems orderItem = new OrderItems();
-        orderItem.setOrder(savedOrder);
-        orderItem.setProduct(product);
-        orderItem.setQuantity(request.getQuantity());
-
-        orderItem.setPrice(discountedUnitPrice);
-        orderItem.setDiscount(productDiscountPerItem);
-        //orderItem.setTax(mrp * 0.05);
-
-        Long categoryId = product.getCategory().getId();
-        double taxPercent = taxService.getTaxPercentByCategoryId(categoryId);
-        double totalPrice = discountedUnitPrice * request.getQuantity();
-        double taxAmount = totalPrice * taxPercent / 100;
-
-
-        orderItem.setTax(taxAmount);
-        orderItem.setTax(taxAmount);
-
-
-        orderItemsRepository.save(orderItem);
-
-        orderRepository.flush();
-
-        List<Inventory> inventories = inventoryRepository.findByProductId(product.getId());
-        if (!inventories.isEmpty()) {
-            inventoryService.reserveStock(inventories.get(0).getId(), request.getQuantity(), savedOrder.getId());
-        }
-
-        return convertToOrderDTO(savedOrder);
-    }
-
+    @Cacheable(
+            value = "topProducts", key = "'thisMonth'")
     @Transactional(readOnly = true)
     public List<TopOrderedProductsDTO> getTopOrderedProductsThisMonth() {
+
         if (!SecurityUtil.isAdmin()) {
             throw new RuntimeException("Unauthorized: Admin access required");
         }
@@ -1125,10 +961,135 @@ public class OrderService {
         LocalDate startDate = LocalDate.now().withDayOfMonth(1);
         LocalDate endDate = LocalDate.now();
 
-        List<TopOrderedProductsDTO> results = orderItemsRepository.findTopOrderedProductsByDateRange(startDate, endDate);
+        log.info("Fetching top ordered products for current month: {} to {}",
+                startDate, endDate);
+
+        List<TopOrderedProductsDTO> results =
+                orderItemsRepository.findTopOrderedProductsByDateRange(startDate, endDate);
 
         return results.stream()
                 .limit(10)
                 .collect(Collectors.toList());
+    }
+
+    @CacheEvict(
+            value = { "userOrders", "adminOrders", "orderStats", "topProducts"}, allEntries = true)
+    @Transactional
+    public OrderDTO buyNowOrder(BuyNowRequestDTO request) {
+
+        Long userId = SecurityUtil.getCurrentUserId()
+                .orElseThrow(() -> new RuntimeException("User not authenticated"));
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        Product product = productRepository.findById(request.getProductId())
+                .orElseThrow(() -> new ResourceNotFoundException("Product not found"));
+
+        Address address = addressRepository.findById(request.getAddressId())
+                .orElseThrow(() -> new ResourceNotFoundException("Address not found"));
+
+        int qty = request.getQuantity();
+        if (qty <= 0) {
+            throw new RuntimeException("Quantity must be greater than zero");
+        }
+
+     //  INVENTORY CHECK
+        Inventory inventory = inventoryRepository.findByProductId(product.getId())
+                .stream()
+                .findFirst()
+                .orElseThrow(() -> new RuntimeException("No inventory found"));
+
+        if (inventory.getAvailableStock() < qty) {
+            throw new RuntimeException("Insufficient stock for product: " + product.getProductName());
+        }
+
+       // PRODUCT DISCOUNT
+        double mrp = product.getMRP();
+        double productDiscountPerUnit = 0.0;
+
+        Optional<ProductDiscount> activeDiscount =
+                productDiscountRepository.findByProductId(product.getId())
+                        .stream()
+                        .filter(pd -> pd.getDiscount().getActive())
+                        .findFirst();
+
+        if (activeDiscount.isPresent()) {
+            Discount d = activeDiscount.get().getDiscount();
+            productDiscountPerUnit =
+                    d.getDiscountType() == DiscountType.PERCENT
+                            ? (mrp * d.getDiscountValue()) / 100
+                            : d.getDiscountValue();
+        }
+
+        double discountedUnitPrice = mrp - productDiscountPerUnit;
+        double subTotal = discountedUnitPrice * qty;
+
+      // COUPON DISCOUNT
+        double couponDiscount = 0.0;
+
+        if (request.getCouponCode() != null && !request.getCouponCode().isBlank()) {
+            Coupon coupon = couponRepository.findByCode(request.getCouponCode());
+
+            if (coupon == null || !coupon.isActive() || coupon.getEndDate().isBefore(LocalDate.now())) {
+                throw new RuntimeException("Invalid or expired coupon");
+            }
+
+            if (subTotal < coupon.getMinOrderAmount()) {
+                throw new RuntimeException("Minimum order amount is " + coupon.getMinOrderAmount());
+            }
+
+            couponDiscount =
+                    coupon.getDiscountType() == DiscountType.PERCENT
+                            ? (subTotal * coupon.getDiscountValue()) / 100
+                            : coupon.getDiscountValue();
+
+            if (coupon.getMaxDiscountAmount() != null) {
+                couponDiscount = Math.min(couponDiscount, coupon.getMaxDiscountAmount());
+            }
+        }
+
+    //   TAX
+        double taxPercent = taxService.getTaxPercentByCategoryId(product.getCategory().getId());
+        double taxableAmount = subTotal - couponDiscount;
+        double taxAmount = (taxableAmount * taxPercent) / 100;
+
+        double finalOrderAmount = taxableAmount + taxAmount;
+
+    //   CREATE ORDER
+        Order order = new Order();
+        order.setUser(user);
+        order.setOrderDate(LocalDate.now());
+        order.setOrderStatus(OrderStatus.PENDING);
+        order.setPaymentStatus(PaymentStatus.PENDING);
+        order.setShippingAddress(address);
+        order.setOrderAmount(finalOrderAmount);
+
+        Order savedOrder = orderRepository.save(order);
+
+     //  ORDER ITEM
+        OrderItems orderItem = new OrderItems();
+        orderItem.setOrder(savedOrder);
+        orderItem.setProduct(product);
+        orderItem.setQuantity(qty);
+        orderItem.setPrice(discountedUnitPrice);
+        orderItem.setDiscount(productDiscountPerUnit);
+        orderItem.setTax(taxAmount / qty);
+
+        orderItemsRepository.save(orderItem);
+
+      // RESERVE STOCK
+        inventoryService.reserveStock(inventory.getId(), qty, savedOrder.getId());
+
+        log.info(" BUY NOW ORDER PLACED");
+        log.info("Product      : {}", product.getProductName());
+        log.info("Qty          : {}", qty);
+        log.info("MRP          : {}", mrp);
+        log.info("Unit Price   : {}", discountedUnitPrice);
+        log.info("Coupon Disc  : {}", couponDiscount);
+        log.info("Tax          : {}", taxAmount);
+        log.info("Final Amount : {}", finalOrderAmount);
+
+        return convertToOrderDTO(savedOrder);
     }
 }

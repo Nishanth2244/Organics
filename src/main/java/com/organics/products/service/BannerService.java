@@ -135,7 +135,6 @@ public class BannerService {
     }
 
     @CacheEvict(value = "banners", allEntries = true)
-
     public void deleteBanner(Long id) {
 
         log.warn("Deleting banner ID {}", id);

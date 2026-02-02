@@ -194,8 +194,7 @@ public class CategoryService {
 	}
 
     @Cacheable(
-            value = "inactiveCategories",
-            key = "#page + '-' + #size",
+            value = "inactiveCategories", key = "#page + '-' + #size",
             unless = "#result == null || #result.isEmpty()")
 	@Transactional(readOnly = true)
 	public Page<CategoryDTO> getInActive(int page, int size) {

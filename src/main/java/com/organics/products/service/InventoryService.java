@@ -119,7 +119,9 @@ public class InventoryService {
                 inventoryId, inventory.getAvailableStock());
     }
 
-
+    @Cacheable(
+            value = "inventory", key = "'branch-' + #branchId + '-' + #page + '-' + #size",
+            unless = "#result == null || #result.isEmpty()")
     public Page<InventoryResponse> getInventoryByBranch( int page, int size,Long branchId) {
         Pageable pageable = PageRequest.of(page, size, Sort.by("id").descending());
 
@@ -154,7 +156,8 @@ public class InventoryService {
                 .map(this::mapToResponse)
                 .toList();
     }
-
+    @Cacheable(
+            value = "inventory", key = "'all-' + #page + '-' + #size", unless = "#result == null || #result.isEmpty()")
     public Page<InventoryResponse> getAllInventory(int page,int size) {
 
         log.info("Fetching all inventory");
@@ -268,7 +271,9 @@ public class InventoryService {
         log.info("Stock released successfully: inventoryId={}", inventoryId);
     }
 
-
+    @Cacheable(
+            value = "inventoryTransactions", key = "'inventory-' + #inventoryId + '-' + #page + '-' + #size",
+            unless = "#result == null || #result.isEmpty()")
     public Page<InventoryTransactions> getInventoryTransactions(int page,int size,Long inventoryId) {
 
         log.info("Fetching transactions for inventory {}", inventoryId);

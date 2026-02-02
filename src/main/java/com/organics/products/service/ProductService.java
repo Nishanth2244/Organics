@@ -16,6 +16,7 @@ import com.organics.products.respository.ProductRepo;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.*;
 import org.springframework.stereotype.Service;
@@ -33,9 +34,7 @@ public class ProductService {
     @Autowired private DiscountService discountService;
     @Autowired private S3Service s3Service;
 
-    /* =========================
-       DTO CONVERTER
-       ========================= */
+      // DTO CONVERTER
     private ProductDTO convertToDTO(Product product) {
 
         ProductDTO dto = new ProductDTO();
@@ -83,10 +82,11 @@ public class ProductService {
         return dto;
     }
 
-    /* =========================
-       ADD PRODUCT
-       ========================= */
-    public ProductDTO add(
+      // ADD PRODUCT
+      @CacheEvict(
+              value = {
+                      "productsByCategory", "productsSearch", "inactiveProducts", "activeProducts"}, allEntries = true)
+      public ProductDTO add(
             Long categoryId,
             MultipartFile[] images,
             String productName,
@@ -128,9 +128,10 @@ public class ProductService {
         return convertToDTO(saved);
     }
 
-    /* =========================
-       STATUS UPDATE
-       ========================= */
+    //  STATUS UPDATE
+    @CacheEvict(
+            value = {
+                    "productsByCategory", "productsSearch", "inactiveProducts", "activeProducts"}, allEntries = true)
     public void inActive(Long id, boolean status) {
 
         Product product = productRepo.findById(id)
@@ -140,9 +141,7 @@ public class ProductService {
         productRepo.save(product);
     }
 
-    /* =========================
-       ACTIVE PRODUCTS (CUSTOM RESPONSE)
-       ========================= */
+     //  ACTIVE PRODUCTS (CUSTOM RESPONSE)
     @Cacheable(value = "activeProducts:v2", key = "#page + '-' + #size")
     @Transactional(readOnly = true)
     public PagedResponse<ProductDTO> activeProd(int page, int size) {
@@ -163,9 +162,10 @@ public class ProductService {
         return response;
     }
 
-    /* =========================
-       INACTIVE PRODUCTS
-       ========================= */
+      // INACTIVE PRODUCTS
+      @Cacheable(
+              value = "inactiveProducts", key = "'inactive-' + #page + '-' + #size",
+              unless = "#result == null || #result.isEmpty()")
     @Transactional(readOnly = true)
     public Page<ProductDTO> getInActive(int page, int size) {
 
@@ -174,9 +174,10 @@ public class ProductService {
                 .map(this::convertToDTO);
     }
 
-    /* =========================
-       UPDATE PRODUCT
-       ========================= */
+     //  UPDATE PRODUCT
+     @CacheEvict(
+             value = {
+                     "productsByCategory", "productsSearch", "inactiveProducts", "activeProducts"}, allEntries = true)
     public ProductDTO updateProduct(
             Long id,
             MultipartFile[] images,
@@ -209,9 +210,10 @@ public class ProductService {
         return convertToDTO(productRepo.save(product));
     }
 
-    /* =========================
-       BY CATEGORY
-       ========================= */
+      // BY CATEGORY
+      @Cacheable(
+              value = "productsByCategory", key = "'cat-' + #categoryId + '-' + #page + '-' + #size",
+              unless = "#result == null || #result.isEmpty()")
     @Transactional(readOnly = true)
     public Page<ProductDTO> byCategory(Long categoryId, int page, int size) {
 
@@ -220,9 +222,10 @@ public class ProductService {
                 .map(this::convertToDTO);
     }
 
-    /* =========================
-       SEARCH
-       ========================= */
+      // SEARCH
+      @Cacheable(
+              value = "productsSearch", key = "'search-' + #name.toLowerCase() + '-' + #page + '-' + #size",
+              unless = "#result == null || #result.isEmpty()")
     @Transactional(readOnly = true)
     public Page<ProductDTO> searchByName(String name, int page, int size) {
 

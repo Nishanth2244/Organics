@@ -150,8 +150,7 @@ public class CartService {
 	}
     @CacheEvict(
             value = "userCart",
-            key = "T(com.organics.products.config.SecurityUtil).getCurrentUserId().orElse(null)"
-    )
+            key = "T(com.organics.products.config.SecurityUtil).getCurrentUserId().orElse(null)")
 	public CartDTO addToCart(AddToCartRequest request) {
 
 		log.info("Adding item to cart: inventoryId={}, qty={}",
@@ -240,10 +239,8 @@ public class CartService {
 	}
 
     @Cacheable(
-            value = "userCart",
-            key = "T(com.organics.products.config.SecurityUtil).getCurrentUserId().orElse(null)",
-            unless = "#result == null"
-    )
+            value = "userCart", key = "T(com.organics.products.config.SecurityUtil).getCurrentUserId().orElse(null)",
+            unless = "#result == null")
 	public CartDTO myCart() {
 
 		Long customerId = SecurityUtil.getCurrentUserId()
@@ -315,8 +312,7 @@ public class CartService {
 
     @CacheEvict(
             value = "userCart",
-            key = "T(com.organics.products.config.SecurityUtil).getCurrentUserId().orElse(null)"
-    )
+            key = "T(com.organics.products.config.SecurityUtil).getCurrentUserId().orElse(null)")
 	public CartDTO applyCoupon(Long couponId) {
 
 		log.info("Applying coupon. couponId={}", couponId);
