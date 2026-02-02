@@ -43,6 +43,8 @@ public class OrderController {
         return ResponseEntity.ok(order);
     }
 
+
+
     @GetMapping("/my-orders")
     public ResponseEntity<Page<OrderDTO>> getUserOrders(
             @RequestParam(defaultValue = "0") int page,
@@ -52,10 +54,11 @@ public class OrderController {
         return ResponseEntity.ok(orders);
     }
 
-    @GetMapping("/{orderId}")
-    public ResponseEntity<OrderDTO> getOrder(@PathVariable Long orderId) {
-        OrderDTO order = orderService.getOrderById(orderId);
-        return ResponseEntity.ok(order);
+
+    @GetMapping("/id/{orderId}")
+    public ResponseEntity<OrderDTO> getOrder(
+            @PathVariable Long orderId) {
+        return ResponseEntity.ok(orderService.getOrderById(orderId));
     }
 
     @GetMapping("/track/{orderId}")
@@ -63,6 +66,8 @@ public class OrderController {
         ShiprocketTrackingResponse trackingInfo = orderService.trackOrder(orderId);
         return ResponseEntity.ok(trackingInfo);
     }
+
+
 
 //    @GetMapping("/{orderId}/label")
 //    public ResponseEntity<byte[]> getShippingLabel(@PathVariable Long orderId) {

@@ -8,6 +8,8 @@ import com.organics.products.exception.DiscountException;
 import com.organics.products.exception.DiscountNotFoundException;
 import com.organics.products.respository.*;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -49,7 +51,8 @@ public class DiscountService {
         this.notificationService = notificationService;
     }
 
-
+    @CacheEvict(value = {
+                    "productFinalPrice", "productApplicableDiscount", "allDiscounts"}, allEntries = true)
     public DiscountDTO createDiscount(DiscountRequestDTO dto) {
 
         log.info("Creating discount: {}", dto.getName());
@@ -90,7 +93,8 @@ public class DiscountService {
         return convertToDTO(saved);
     }
 
-
+    @CacheEvict(value = {
+            "productFinalPrice", "productApplicableDiscount", "allDiscounts"}, allEntries = true)
     public void assignToProduct(Long productId, Long discountId) {
 
         Product product = productRepo.findById(productId)
@@ -112,7 +116,8 @@ public class DiscountService {
         productDiscountRepository.save(pd);
     }
 
-
+    @CacheEvict(value = {
+            "productFinalPrice", "productApplicableDiscount", "allDiscounts"}, allEntries = true)
     public void assignToCategory(Long categoryId, Long discountId) {
 
         Category category = categoryRepo.findById(categoryId)
@@ -134,7 +139,8 @@ public class DiscountService {
         categoryDiscountRepository.save(cd);
     }
 
-
+    @CacheEvict(value = {
+            "productFinalPrice", "productApplicableDiscount", "allDiscounts"}, allEntries = true)
     public void assignToCart(Long cartId, Long discountId) {
 
         if (!cartRepository.existsById(cartId)) {
@@ -153,7 +159,8 @@ public class DiscountService {
         cartDiscountRepository.save(cd);
     }
 
-
+    @Cacheable(
+            value = "productFinalPrice", key = "#product.id", unless = "#result == null")
     public double calculateFinalPrice(Product product) {
 
         if (product == null) {
@@ -194,6 +201,8 @@ public class DiscountService {
         return applyDiscount(discount, cartTotal);
     }
 
+    @Cacheable(
+            value = "productApplicableDiscount", key = "#product.id", unless = "#result == null")
     public Discount getApplicableDiscount(Product product) {
 
         if (product == null) return null;
@@ -274,6 +283,7 @@ public class DiscountService {
 
         return dto;
     }
+    @Cacheable(value = "allDiscounts", unless = "#result == null || #result.isEmpty()")
     public List<DiscountDTO> getAll() {
 
         log.info("Fetching all discounts");

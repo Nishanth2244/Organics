@@ -9,6 +9,7 @@ import com.organics.products.exception.InventoryNotFoundException;
 import com.organics.products.respository.*;
 import jakarta.transaction.Transactional;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -134,7 +135,10 @@ public class InventoryService {
         return inventories
                 .map(this::mapToResponse);
                 }
-
+    @Cacheable(
+            value = "inventory:byProduct",
+            key = "#productId",
+            unless = "#result == null || #result.isEmpty()")
     public List<InventoryResponse> getInventoryByProduct(Long productId) {
 
         log.info("Fetching inventory for product {}", productId);

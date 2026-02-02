@@ -5,6 +5,8 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -58,7 +60,8 @@ public class CategoryService {
 		return dto;
 	}
 
-
+    @CacheEvict(
+            value = { "activeCategories", "inactiveCategories", "categoryRevenue"}, allEntries = true)
 	public CategoryDTO addCategory(String categoryName,
 								   String description,
 								   MultipartFile imageFile) throws IOException {
@@ -94,7 +97,10 @@ public class CategoryService {
 
 		return convertToDTO(saved);
 	}
-
+    @Cacheable(
+            value = "activeCategories",
+            key = "#page + '-' + #size",
+            unless = "#result == null || #result.isEmpty()")
 	@Transactional(readOnly = true)
 	public Page<CategoryDTO> getActive(int page, int size) {
 
@@ -114,8 +120,8 @@ public class CategoryService {
 		return categoriesPage.map(this::convertToDTO);
 	}
 
-
-
+    @CacheEvict(
+            value = { "activeCategories", "inactiveCategories", "categoryRevenue"}, allEntries = true)
 	public Category updateCategory(Long id,
 								   String categoryName,
 								   String description,
@@ -157,6 +163,8 @@ public class CategoryService {
 		return updated;
 	}
 
+    @CacheEvict(
+            value = { "activeCategories", "inactiveCategories", "categoryRevenue"}, allEntries = true)
 	public void inActive(Long id, Boolean status) {
 
 		log.info("Updating category status. categoryId={}, status={}", id, status);
@@ -185,7 +193,10 @@ public class CategoryService {
 		log.info("Category status updated successfully. categoryId={}, status={}", id, status);
 	}
 
-
+    @Cacheable(
+            value = "inactiveCategories",
+            key = "#page + '-' + #size",
+            unless = "#result == null || #result.isEmpty()")
 	@Transactional(readOnly = true)
 	public Page<CategoryDTO> getInActive(int page, int size) {
 
@@ -206,7 +217,9 @@ public class CategoryService {
 	}
 
 
-
+    @Cacheable(
+            value = "categoryRevenue",
+            key = "#month + '-' + #year + '-' + #page + '-' + #size")
 	@Transactional(readOnly = true)
 	public Page<CategoryRevenueDTO> getCategoryRevenueByMonth(
 			int page, int size, int month, int year) {

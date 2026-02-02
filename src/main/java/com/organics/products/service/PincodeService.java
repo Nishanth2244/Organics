@@ -4,6 +4,7 @@ import com.organics.products.dto.LocationResponse;
 import com.organics.products.exception.ExternalServiceException;
 import com.organics.products.exception.PincodeNotFoundException;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.ResourceAccessException;
@@ -22,6 +23,8 @@ public class PincodeService {
         this.restClient = restClient;
     }
 
+    @Cacheable(
+            value = "pincodeLocation", key = "#pinCode", unless = "#result == null")
     public LocationResponse getByPincode(String pinCode) {
 
         log.info("Fetching location for pincode: {}", pinCode);

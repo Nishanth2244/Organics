@@ -6,6 +6,8 @@ import com.organics.products.entity.Branch;
 import com.organics.products.exception.ResourceNotFoundException;
 import com.organics.products.respository.BranchRepository;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -26,7 +28,8 @@ public class BranchService {
         this.branchRepository = branchRepository;
     }
 
-
+    @CacheEvict(
+            value = {"branches", "branchesByStatus"}, allEntries = true)
     public BranchResponse createBranch(BranchCreateRequest request) {
 
         log.info("Creating new branch with code={}", request.getBranchCode());
@@ -53,7 +56,8 @@ public class BranchService {
         return mapToResponse(saved);
     }
 
-
+    @Cacheable(
+            value = "branches", key = "'all-' + #page + '-' + #size", unless = "#result == null || #result.isEmpty()")
     public Page<BranchResponse> getAllBranches(int page, int size) {
 
         log.info("Fetching all branches: page={}, size={}", page, size);
@@ -72,9 +76,8 @@ public class BranchService {
         return branchesPage.map(this::mapToResponse);
     }
 
-
-
-
+    @Cacheable(
+            value = "branchesByStatus", key = "#active + '-' + #page + '-' + #size", unless = "#result == null || #result.isEmpty()")
     public void updateBranchStatus(Long branchId, Boolean active) {
 
         log.info("Updating branch status. branchId={}, active={}", branchId, active);
@@ -92,7 +95,8 @@ public class BranchService {
                 branchId, active);
     }
 
-
+    @CacheEvict(
+            value = {"branches", "branchesByStatus"}, allEntries = true)
     public BranchResponse updateBranch(Long branchId, BranchCreateRequest request) {
 
         log.info("Updating branch. branchId={}", branchId);
@@ -116,7 +120,8 @@ public class BranchService {
         return mapToResponse(updated);
     }
 
-
+    @CacheEvict(
+            value = {"branches", "branchesByStatus"}, allEntries = true)
     public Page<BranchResponse> getBranchesByStatus(int page,int size,Boolean active) {
 
         log.info("Fetching branches by status. active={}, page={}, size={}", active, page, size);
@@ -135,7 +140,6 @@ public class BranchService {
         return branches.map(this::mapToResponse);
 
     }
-
 
     private BranchResponse mapToResponse(Branch branch) {
 

@@ -7,6 +7,8 @@ import java.util.Optional;
 
 import com.organics.products.entity.*;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 import com.organics.products.config.SecurityUtil;
@@ -146,7 +148,10 @@ public class CartService {
 			return cart;
 		}
 	}
-
+    @CacheEvict(
+            value = "userCart",
+            key = "T(com.organics.products.config.SecurityUtil).getCurrentUserId().orElse(null)"
+    )
 	public CartDTO addToCart(AddToCartRequest request) {
 
 		log.info("Adding item to cart: inventoryId={}, qty={}",
@@ -234,7 +239,11 @@ public class CartService {
 		return convertToCartDTO(savedCart);
 	}
 
-
+    @Cacheable(
+            value = "userCart",
+            key = "T(com.organics.products.config.SecurityUtil).getCurrentUserId().orElse(null)",
+            unless = "#result == null"
+    )
 	public CartDTO myCart() {
 
 		Long customerId = SecurityUtil.getCurrentUserId()
@@ -249,7 +258,6 @@ public class CartService {
 
 		return convertToCartDTO(cart);
 	}
-
 
 	public CartDTO decreaseQuantity(Long inventoryId) {
 
@@ -305,7 +313,10 @@ public class CartService {
 		return convertToCartDTO(updatedCart);
 	}
 
-
+    @CacheEvict(
+            value = "userCart",
+            key = "T(com.organics.products.config.SecurityUtil).getCurrentUserId().orElse(null)"
+    )
 	public CartDTO applyCoupon(Long couponId) {
 
 		log.info("Applying coupon. couponId={}", couponId);
@@ -373,7 +384,7 @@ public class CartService {
 	}
 
 
-	public CartDTO removeCoupon(Long couponId) {
+    public CartDTO removeCoupon(Long couponId) {
 
 		log.info("Removing coupon. couponId={}", couponId);
 

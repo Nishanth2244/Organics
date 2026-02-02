@@ -8,6 +8,8 @@ import com.organics.products.exception.ResourceNotFoundException;
 import com.organics.products.respository.BannerRepository;
 import com.organics.products.respository.UserRepository;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -42,7 +44,7 @@ public class BannerService {
         this.notificationService = notificationService;
     }
 
-
+    @CacheEvict(value = "banners", allEntries = true)
     public BannerResponse add(
             MultipartFile[] images,
             String title,
@@ -111,7 +113,8 @@ public class BannerService {
         return mapToResponse(saved);
     }
 
-
+    @Cacheable(
+            value = "banners", unless = "#result == null || #result.isEmpty()")
     @Transactional(readOnly = true)
     public List<BannerResponse> getAllBanners() {
 
@@ -131,8 +134,7 @@ public class BannerService {
                 .toList();
     }
 
-
-
+    @CacheEvict(value = "banners", allEntries = true)
 
     public void deleteBanner(Long id) {
 
@@ -156,7 +158,7 @@ public class BannerService {
         log.info("Banner deleted successfully ID {}", id);
     }
 
-
+    @CacheEvict(value = "banners", allEntries = true)
     public BannerResponse update(
             Long id,
             MultipartFile[] images,

@@ -23,6 +23,7 @@ import org.springframework.data.redis.listener.ChannelTopic;
 import org.springframework.data.redis.listener.RedisMessageListenerContainer;
 import org.springframework.data.redis.listener.adapter.MessageListenerAdapter;
 import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer;
+import org.springframework.data.redis.serializer.RedisSerializationContext;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
@@ -37,6 +38,8 @@ public class RedisConfig {
     public RedisConfig(RedisProperties redisProperties) {
         this.redisProperties = redisProperties;
     }
+
+    // Redis Connection Factory
 
     @Bean
     public LettuceConnectionFactory redisConnectionFactory() {
@@ -54,20 +57,15 @@ public class RedisConfig {
 
             for (String s : sentinel.getNodes()) {
                 String[] parts = s.split(":");
-                if (parts.length != 2) {
-                    throw new IllegalArgumentException("Invalid sentinel node: " + s);
-                }
                 sentinelConfig.sentinel(parts[0], Integer.parseInt(parts[1]));
             }
 
             if (redisProperties.getPassword() != null &&
                     !redisProperties.getPassword().isBlank()) {
-
                 sentinelConfig.setPassword(
                         RedisPassword.of(redisProperties.getPassword()));
             }
 
-            System.out.println("Starting Redis in SENTINEL mode");
             return new LettuceConnectionFactory(sentinelConfig);
         }
 
@@ -79,25 +77,15 @@ public class RedisConfig {
 
         if (redisProperties.getPassword() != null &&
                 !redisProperties.getPassword().isBlank()) {
-
             redisConfig.setPassword(
                     RedisPassword.of(redisProperties.getPassword()));
         }
 
-        System.out.println("Starting Redis in STANDALONE mode");
         return new LettuceConnectionFactory(redisConfig);
     }
 
-    @Bean
-    public RedisCacheManager cacheManager(RedisConnectionFactory connectionFactory) {
-        return RedisCacheManager.builder(connectionFactory)
-                .cacheDefaults(
-                        RedisCacheConfiguration.defaultCacheConfig()
-                                .entryTtl(Duration.ofMinutes(5))
-                )
-                .build();
-    }
-
+    // RedisTemplate (Notification)
+    // ===============================
     @Bean
     public RedisTemplate<String, Notification> redisTemplate(
             RedisConnectionFactory connectionFactory,
@@ -114,10 +102,12 @@ public class RedisConfig {
         template.setHashKeySerializer(new StringRedisSerializer());
         template.setHashValueSerializer(serializer);
 
-        template.afterPropertiesSet();
         return template;
     }
 
+
+    // RedisTemplate (Generic Object)
+    // ===============================
     @Bean
     public RedisTemplate<String, Object> redisTemplateObject(
             RedisConnectionFactory connectionFactory,
@@ -134,14 +124,12 @@ public class RedisConfig {
         template.setHashKeySerializer(new StringRedisSerializer());
         template.setHashValueSerializer(serializer);
 
-        template.afterPropertiesSet();
         return template;
     }
 
-
+    // Pub/Sub Listener
     @Bean
     public MessageListenerAdapter messageListener(EventListener eventListener) {
-        // Spring automatically injects the @Component EventListener here
         return new MessageListenerAdapter(eventListener);
     }
 
@@ -173,6 +161,8 @@ public class RedisConfig {
 
         return container;
     }
+
+    // ObjectMapper
 
     @Bean
     public ObjectMapper objectMapper() {

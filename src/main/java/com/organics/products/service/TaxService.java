@@ -6,6 +6,8 @@ import com.organics.products.respository.CategoryRepo;
 import com.organics.products.respository.CategoryTaxRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -16,6 +18,7 @@ public class TaxService {
     private final CategoryRepo categoryRepo;
 
     @Transactional
+    @CacheEvict(value = "categoryTax", key = "#categoryId")
     public CategoryTax saveOrUpdateTax(Long categoryId, double taxPercent) {
 
         if (taxPercent < 0 || taxPercent > 100) {
@@ -34,7 +37,7 @@ public class TaxService {
 
         return categoryTaxRepository.save(tax);
     }
-
+    @Cacheable(value = "categoryTax", key = "#categoryId")
     public double getTaxPercentByCategoryId(Long categoryId) {
         return categoryTaxRepository
                 .findByCategory_Id(categoryId)

@@ -15,6 +15,8 @@ import com.organics.products.dto.*;
 import com.organics.products.entity.*;
 import com.organics.products.respository.*;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -76,7 +78,8 @@ public class OrderService {
     @Autowired
     private TaxService taxService;
 
-
+    @CacheEvict(
+            value = { "userOrders", "adminOrders", "orderStats", "topProducts"}, allEntries = true)
     @Transactional
     public OrderDTO placeOrder(OrderAddressRequestDTO orderRequest) {
         Long userId = SecurityUtil.getCurrentUserId()
@@ -214,9 +217,6 @@ public class OrderService {
             calculatedTotalDiscount += itemDiscount;
 
 
-
-
-
             orderItem.setPrice(pricePerUnit); // Price per unit
             orderItem.setDiscount(itemDiscount / cartItem.getQuantity()); // Discount per unit
             orderItem.setTax(itemTax / cartItem.getQuantity()); // Tax per unit
@@ -238,7 +238,6 @@ public class OrderService {
             log.info("Item Tax: {}", itemTax);
             log.info("Item Total (price + tax): {}", itemTotalPrice + itemTax);
         }
-
 
 
         if (orderItemsList.isEmpty()) {
@@ -348,6 +347,10 @@ public class OrderService {
         return cart;
     }
 
+    @Cacheable(
+            value = "userOrders",
+            key = "T(com.organics.products.config.SecurityUtil).getCurrentUserId().orElse(null) + '-' + #page + '-' + #size",
+            unless = "#result == null")
     @Transactional(readOnly = true)
     public Page<OrderDTO> getUserOrders(int page, int size) {
 
@@ -369,7 +372,8 @@ public class OrderService {
         return orderPage.map(this::convertToOrderDTO);
     }
 
-
+    @Cacheable(
+            value = "orderById", key = "#orderId", unless = "#result == null")
     @Transactional(readOnly = true)
     public OrderDTO getOrderById(Long orderId) {
         Long userId = SecurityUtil.getCurrentUserId()
@@ -384,7 +388,9 @@ public class OrderService {
 
         return convertToOrderDTO(order);
     }
-
+    @Cacheable(
+            value = "adminOrders",
+            key = "'all'")
     @Transactional(readOnly = true)
     public List<OrderDTO> getAllOrders() {
         if (!SecurityUtil.isAdmin()) {
@@ -397,7 +403,9 @@ public class OrderService {
                 .map(this::convertToOrderDTO)
                 .collect(Collectors.toList());
     }
-
+    @Cacheable(
+            value = "adminOrders",
+            key = "'status-' + #status")
     @Transactional(readOnly = true)
     public List<OrderDTO> getOrdersByStatus(OrderStatus status) {
         if (!SecurityUtil.isAdmin()) {
@@ -410,12 +418,12 @@ public class OrderService {
                 .map(this::convertToOrderDTO)
                 .collect(Collectors.toList());
     }
-
+    @CacheEvict(
+            value = { "orderById", "userOrders", "adminOrders", "orderStats"}, allEntries = true)
     @Transactional
     public OrderDTO updateOrderStatus(Long orderId, OrderStatus status) {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Order not found: " + orderId));
-
 
         order.setOrderStatus(status);
 
@@ -446,6 +454,8 @@ public class OrderService {
         return convertToOrderDTO(updatedOrder);
     }
 
+    @CacheEvict(
+            value = { "orderById", "userOrders", "adminOrders", "orderStats"}, allEntries = true)
     @Transactional
     public OrderDTO cancelOrder(Long orderId) {
         Long userId = SecurityUtil.getCurrentUserId()
@@ -645,12 +655,12 @@ public class OrderService {
         dto.setCartDiscount(totalCartDiscount);
         dto.setTotalDiscount(totalCartDiscount);
         dto.setGrandTotal(orderSubtotal + orderTax - totalCartDiscount);
-
-
-
         return dto;
     }
 
+    @Cacheable(
+            value = "orderStats",
+            key = "'summary'")
     @Transactional(readOnly = true)
     public Map<String, Object> getOrderStatistics() {
         if (!SecurityUtil.isAdmin()) {
@@ -688,7 +698,9 @@ public class OrderService {
         );
     }
 
-
+    @Cacheable(
+            value = "adminOrders",
+            key = "'date-' + #date")
     @Transactional(readOnly = true)
     public List<OrderDTO> getOrdersOnDate(LocalDate date) {
         if (!SecurityUtil.isAdmin()) {
@@ -705,6 +717,9 @@ public class OrderService {
                 .collect(Collectors.toList());
     }
 
+    @Cacheable(
+            value = "orderStats",
+            key = "'daily-' + #startDate + '-' + #endDate")
     @Transactional(readOnly = true)
     public List<DailyOrderStatsDTO> getDailyOrderStatistics(LocalDate startDate, LocalDate endDate) {
         if (!SecurityUtil.isAdmin()) {
@@ -971,7 +986,9 @@ public class OrderService {
                 .limit(10)
                 .collect(Collectors.toList());
     }
-
+    @Cacheable(
+            value = "topProducts",
+            key = "#limit + '-' + #startDate + '-' + #endDate + '-' + #inventoryId")
     @Transactional(readOnly = true)
     public List<TopOrderedProductsDTO> getTopOrderedProductsLast30Days() {
         if (!SecurityUtil.isAdmin()) {
@@ -988,6 +1005,8 @@ public class OrderService {
                 .collect(Collectors.toList());
     }
 
+    @CacheEvict(
+            value = { "userOrders", "adminOrders", "orderStats", "topProducts"}, allEntries = true)
     @Transactional
     public OrderDTO buyNowOrder(BuyNowRequestDTO request) {
 

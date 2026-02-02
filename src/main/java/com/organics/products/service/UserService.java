@@ -9,6 +9,9 @@ import com.organics.products.entity.User;
 import com.organics.products.exception.ResourceNotFoundException;
 import com.organics.products.respository.UserRepository;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -25,6 +28,9 @@ public class UserService {
     }
 
 
+    @Cacheable(
+            value = "userProfile",
+            key = "T(com.organics.products.config.SecurityUtil).getCurrentUserId().get()")
     public UserProfileResponse getMyProfile() {
 
         Long userId = SecurityUtil.getCurrentUserId()
@@ -89,9 +95,12 @@ public class UserService {
         return ar;
     }
 
-    // =========================
+
     // Update Display Name
-    // =========================
+    @CacheEvict(
+            value = { "userProfile", "userDisplayName", "allUsers" },
+            key = "T(com.organics.products.config.SecurityUtil).getCurrentUserId().orElse(null)"
+    )
     public void updateDisplayName(String displayName) {
 
         if (displayName == null || displayName.trim().isEmpty()) {
@@ -121,7 +130,7 @@ public class UserService {
                 userId, oldName, displayName.trim());
     }
 
-
+    @Cacheable(value = "allUsers", unless = "#result.isEmpty()")
     public List<UserDTO> getAllUsers() {
 
         log.info("Fetching all users");
@@ -150,7 +159,11 @@ public class UserService {
                 .toList();
     }
 
-
+    @Cacheable(
+            value = "userDisplayName",
+            key = "T(com.organics.products.config.SecurityUtil).getCurrentUserId().orElse(null)",
+            unless = "#result == null"
+    )
     public UserDTO getMyDisplayName() {
 
         Long userId = SecurityUtil.getCurrentUserId()
@@ -176,7 +189,10 @@ public class UserService {
 
         return dto;
     }
-
+    @CacheEvict(
+            value = { "userProfile", "allUsers" },
+            key = "#userId"
+    )
     public void updatePushToken(Long userId, String token) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
